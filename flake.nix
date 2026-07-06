@@ -17,27 +17,27 @@
       packages.${system}.default = pkgs.buildEnv {
         name = "my-tools";
         paths = with pkgs; [
+          bat
+          btdu
+          codex
+          fd
+          jujutsu
           nixd
           nixfmt
-          bat
-          fd
-          sd
-          yazi
-          btdu
-          procs
-          viddy
-          codex
-          jujutsu
+          nix-index
           nodejs
+          osv-scanner
           pnpm
           powershell
+          procs
+          sd
           steel
-          uv
-          osv-scanner
           steelix
-          nix-index
           tldr
+          uv
+          viddy
           wakatime-cli
+          yazi
           zellij
 
           # 来自 unstable（weekly 收录后可改回 pkgs.herdr 并删掉 unstable 输入）
