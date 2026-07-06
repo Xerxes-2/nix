@@ -27,9 +27,9 @@ nix profile upgrade nixcfg
 git commit -am "update $(date +%F)"
 ```
 
-⚠️ herdr 钉在 commit `2bc1724`（避免每次在本机重新编译 Rust）。
-想升级它时：把 `flake.nix` 里 herdr.url 的 commit 换成新的（或临时去掉
-`/2bc1724...` 后缀跑 `nix flake update herdr`），会触发一次本地编译，耐心等。
+ℹ️ herdr 走 `nixpkgs-unstable` 输入（weekly 还没收录，官方缓存有成品免编译）。
+等 weekly 收录后，把 `pkgsUnstable.herdr` 改成普通的 `herdr` 并删掉
+nixpkgs-unstable 输入即可。
 
 ## 回滚
 
