@@ -21,6 +21,7 @@
           btdu
           codex
           fd
+          jjui
           jujutsu
           nixd
           nixfmt
