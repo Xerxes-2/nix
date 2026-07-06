@@ -19,7 +19,9 @@
         paths = with pkgs; [
           bat
           btdu
+          claude-code
           codex
+          difftastic
           fd
           jjui
           jujutsu
@@ -35,6 +37,7 @@
           steel
           steelix
           tldr
+          tombi
           uv
           viddy
           wakatime-cli
