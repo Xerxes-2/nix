@@ -21,7 +21,7 @@
     in
     {
       packages.${system}.default = pkgs.buildEnv {
-        name = "my-tools";
+        name = "Default packages";
         paths = with pkgs; [
           bat
           btdu
