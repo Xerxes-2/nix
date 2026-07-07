@@ -10,8 +10,14 @@
   outputs = { nixpkgs-weekly, nixpkgs-unstable, ... }:
     let
       system = "aarch64-linux";
-      pkgs = nixpkgs-weekly.legacyPackages.${system};
-      pkgsUnstable = nixpkgs-unstable.legacyPackages.${system};
+      # claude-code 是 unfree 许可证,需要显式放行
+      nixpkgsConfig = {
+        allowUnfreePredicate = pkg: builtins.elem (nixpkgs-weekly.lib.getName pkg) [
+          "claude-code"
+        ];
+      };
+      pkgs = import nixpkgs-weekly { inherit system; config = nixpkgsConfig; };
+      pkgsUnstable = import nixpkgs-unstable { inherit system; config = nixpkgsConfig; };
     in
     {
       packages.${system}.default = pkgs.buildEnv {
