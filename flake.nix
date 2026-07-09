@@ -2,7 +2,7 @@
   description = "ubuntu 服务器的 CLI 工具集（声明式包管理）";
 
   inputs = {
-    nixpkgs-weekly.url = "https://flakehub.com/f/DeterminateSystems/nixpkgs-weekly/*.tar.gz";
+    nixpkgs-weekly.url = "https://flakehub.com/f/DeterminateSystems/nixpkgs-weekly/0.1";
   };
 
   outputs = { nixpkgs-weekly, ... }:
