@@ -3,11 +3,9 @@
 
   inputs = {
     nixpkgs-weekly.url = "https://flakehub.com/f/DeterminateSystems/nixpkgs-weekly/*.tar.gz";
-    # 仅供 herdr 使用（weekly 还没收录；官方缓存有 aarch64 成品，免编译）
-    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
   };
 
-  outputs = { nixpkgs-weekly, nixpkgs-unstable, ... }:
+  outputs = { nixpkgs-weekly, ... }:
     let
       system = "aarch64-linux";
       # claude-code 是 unfree 许可证,需要显式放行
@@ -17,7 +15,6 @@
         ];
       };
       pkgs = import nixpkgs-weekly { inherit system; config = nixpkgsConfig; };
-      pkgsUnstable = import nixpkgs-unstable { inherit system; config = nixpkgsConfig; };
     in
     {
       packages.${system}.default = pkgs.buildEnv {
@@ -29,6 +26,7 @@
           codex
           difftastic
           fd
+          herdr
           jjui
           jujutsu
           nixd
@@ -49,9 +47,6 @@
           wakatime-cli
           yazi
           zellij
-
-          # 来自 unstable（weekly 收录后可改回 pkgs.herdr 并删掉 unstable 输入）
-          pkgsUnstable.herdr
         ];
       };
     };
