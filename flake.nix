@@ -32,7 +32,7 @@
           nixd
           nixfmt
           nix-index
-          nodejs
+          nodejs-slim
           osv-scanner
           pnpm
           powershell
