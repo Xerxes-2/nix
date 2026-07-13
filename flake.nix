@@ -26,6 +26,7 @@
           codex
           difftastic
           fd
+          go
           herdr
           jjui
           jujutsu
