@@ -45,6 +45,7 @@
           tombi
           uv
           viddy
+          vscode-json-languageserver
           wakatime-cli
           yazi
           zellij
