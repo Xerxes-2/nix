@@ -38,6 +38,13 @@ in
   # 保留 OCI 串口控制台（救援通道）
   boot.kernelParams = [ "console=tty1" "console=ttyAMA0" ];
 
+  # BBR 拥塞控制：海外 VPS 对外提供服务，吞吐/延迟收益明显
+  boot.kernelModules = [ "tcp_bbr" ];
+  boot.kernel.sysctl = {
+    "net.ipv4.tcp_congestion_control" = "bbr";
+    "net.core.default_qdisc" = "fq";
+  };
+
   # OCI 启动卷走 virtio-scsi；缺这些模块 stage-1 找不到根盘
   boot.initrd.availableKernelModules = [
     "virtio_pci"
@@ -93,7 +100,7 @@ in
 
   zramSwap = {
     enable = true;
-    memoryPercent = 10; # 与 Ubuntu 现状一致 (~2.4G)
+    memoryPercent = 50; # zstd 压缩比通常 3:1+，实际内存占用远小于名义值
   };
 
   # ===== 网络 =====
@@ -141,8 +148,24 @@ in
     enable = true;
     settings = {
       PasswordAuthentication = false;
+      KbdInteractiveAuthentication = false;
       PermitRootLogin = "no";
     };
+  };
+
+  # 22 端口对公网开放：封禁暴力扫描，减少日志噪音
+  services.fail2ban.enable = true;
+
+  # /var/log 独立子卷但无限额，防止日志无限增长
+  services.journald.extraConfig = ''
+    SystemMaxUse=500M
+  '';
+
+  # 每月 scrub 检测静默数据损坏
+  services.btrfs.autoScrub = {
+    enable = true;
+    interval = "monthly";
+    fileSystems = [ "/" ];
   };
 
   # OCI VCN 内部 NTP，低延迟且必达
@@ -180,7 +203,11 @@ in
   nix.settings = {
     experimental-features = [ "nix-command" "flakes" ];
     trusted-users = [ "@wheel" ];
-    auto-optimise-store = true;
+  };
+  # 定时硬链接去重，替代 auto-optimise-store（后者拖慢每次构建）
+  nix.optimise = {
+    automatic = true;
+    dates = [ "weekly" ];
   };
   nix.gc = {
     automatic = true;
@@ -229,6 +256,9 @@ in
     hashTableSizeMB = 256;
     extraOptions = [ "--strip-paths" "--no-timestamps" ];
   };
+
+  # 无头服务器：裁掉 NixOS 手册等文档，减小闭包、加快 rebuild
+  documentation.nixos.enable = false;
 
   # 首次安装即为该版本，之后勿改
   system.stateVersion = "26.05";
