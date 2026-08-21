@@ -31,7 +31,22 @@
       # 主机名别名：本机上 `nixos-rebuild switch --flake ~/nixcfg` 可省略 #oci
       nixosConfigurations."instance-20260821-1942" = self.nixosConfigurations.oci;
 
-      # 其他机器（如 MacBook，standalone home-manager）在此追加：
-      # homeConfigurations."<user>@<host>" = home-manager.lib.homeManagerConfiguration { ... };
+      # MacBook（Apple Silicon，Determinate Nix）：standalone home-manager 入口。
+      # 使用：nix run home-manager -- switch --flake ~/nixcfg#xerxes2
+      # 如果某个共享包在 darwin 上不可用/不需要，在下面 home.nix 里排除即可。
+      # 将来若想升级到 nix-darwin，这份 home 配置可原样挪进其 HM 模块。
+      homeConfigurations."xerxes2" = home-manager.lib.homeManagerConfiguration {
+        pkgs = nixpkgs-unstable.legacyPackages.aarch64-darwin;
+        modules = [
+          ./modules/home/cli.nix
+          {
+            home.username = "xerxes2";
+            home.homeDirectory = "/Users/xerxes2";
+            home.stateVersion = "26.05";
+            nixpkgs.config.allowUnfreePredicate =
+              pkg: builtins.elem (nixpkgs-unstable.lib.getName pkg) [ "claude-code" ];
+          }
+        ];
+      };
     };
 }
