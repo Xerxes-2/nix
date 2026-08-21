@@ -169,6 +169,11 @@ in
     };
   };
 
+  # claude-code 是 unfree 许可证，显式放行（useGlobalPkgs=true，HM 共用此 pkgs）
+  nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
+    "claude-code"
+  ];
+
   # ===== Nix =====
   nix.settings = {
     experimental-features = [ "nix-command" "flakes" ];
