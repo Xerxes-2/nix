@@ -161,6 +161,35 @@ in
     SystemMaxUse=500M
   '';
 
+  # wakapi 原生服务（从 rootless 容器迁入，2026-08）。DynamicUser，
+  # 数据在 /var/lib/private/wakapi/wakapi.db（/var/lib/wakapi 是 symlink）。
+  # salt 必须与容器时代一致（密码哈希依赖它）：/etc/secrets/wakapi.env
+  services.wakapi = {
+    enable = true;
+    environmentFiles = [ "/etc/secrets/wakapi.env" ];
+    settings = {
+      server = {
+        listen_ipv4 = "127.0.0.1";
+        port = 3000;
+        public_url = "https://waka.xerxes2.com";
+      };
+      db = {
+        dialect = "sqlite3";
+        name = "wakapi.db"; # 相对 WorkingDirectory=/var/lib/wakapi
+      };
+      app = {
+        leaderboard_enabled = true;
+        leaderboard_require_auth = true;
+      };
+      security = {
+        insecure_cookies = false;
+        allow_signup = false;
+        invite_codes = true;
+        disable_frontpage = true;
+      };
+    };
+  };
+
   # restic 每日异地备份→ OCI Object Storage（复用 Ubuntu 时代的 vps-backup 仓库）。
   # 旧快照 host=OCI-Ubuntu-arm，新的 host=oci；forget 按 paths 分组，
   # 路径集不变故旧快照会随保留策略自然淘汰。
@@ -171,7 +200,7 @@ in
     environmentFile = "/etc/secrets/restic.env";
     paths = [
       "/home/ubuntu/dufs-data"
-      "/home/ubuntu/wakapi-data"
+      "/var/lib/private/wakapi"
       "/home/ubuntu/sillytavern-data"
       "/home/ubuntu/.config"
       "/etc"

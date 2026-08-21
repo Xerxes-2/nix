@@ -67,22 +67,6 @@
             };
           };
 
-          wakapi = {
-            autoStart = true;
-            unitConfig.Description = "Wakapi time tracking service";
-            serviceConfig = {
-              Restart = "always";
-              TimeoutStartSec = "120";
-            };
-            containerConfig = {
-              image = "ghcr.io/muety/wakapi:latest";
-              name = "wakapi";
-              autoUpdate = "registry";
-              environmentFiles = [ "${home}/.config/wakapi/wakapi.env" ];
-              publishPorts = [ "127.0.0.1:3000:3000" ];
-              volumes = [ "${home}/wakapi-data:/data:rw,U" ];
-            };
-          };
         };
       };
     };
