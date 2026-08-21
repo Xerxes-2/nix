@@ -22,6 +22,7 @@
         modules = [
           quadlet-nix.nixosModules.quadlet
           home-manager.nixosModules.home-manager
+          ./modules/unfree.nix
           ./hosts/oci/configuration.nix
           ./hosts/oci/home.nix
           ./hosts/oci/containers.nix
@@ -38,13 +39,12 @@
       homeConfigurations."xerxes2" = home-manager.lib.homeManagerConfiguration {
         pkgs = nixpkgs-unstable.legacyPackages.aarch64-darwin;
         modules = [
+          ./modules/unfree.nix
           ./modules/home/cli.nix
           {
             home.username = "xerxes2";
             home.homeDirectory = "/Users/xerxes2";
             home.stateVersion = "26.05";
-            nixpkgs.config.allowUnfreePredicate =
-              pkg: builtins.elem (nixpkgs-unstable.lib.getName pkg) [ "claude-code" ];
           }
         ];
       };
