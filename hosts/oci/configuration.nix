@@ -161,6 +161,48 @@ in
     SystemMaxUse=500M
   '';
 
+  # restic 每日异地备份→ OCI Object Storage（复用 Ubuntu 时代的 vps-backup 仓库）。
+  # 旧快照 host=OCI-Ubuntu-arm，新的 host=oci；forget 按 paths 分组，
+  # 路径集不变故旧快照会随保留策略自然淘汰。
+  # 凭据：/etc/secrets/restic.{password,env}（见 MIGRATION.md 的命令式 secrets 惯例）。
+  services.restic.backups.oci = {
+    repository = "s3:https://REDACTED.compat.objectstorage.ap-sydney-1.oraclecloud.com/vps-backup";
+    passwordFile = "/etc/secrets/restic.password";
+    environmentFile = "/etc/secrets/restic.env";
+    paths = [
+      "/home/ubuntu/dufs-data"
+      "/home/ubuntu/wakapi-data"
+      "/home/ubuntu/sillytavern-data"
+      "/home/ubuntu/.config"
+      "/etc"
+    ];
+    exclude = [
+      "**/.cache"
+      "**/node_modules"
+      "**/__pycache__"
+      "*.swp"
+      "*.tmp"
+    ];
+    extraBackupArgs = [
+      "--exclude-caches"
+      "--tag"
+      "scheduled"
+      "--host"
+      "oci"
+    ];
+    pruneOpts = [
+      "--keep-daily 7"
+      "--keep-weekly 4"
+      "--keep-monthly 6"
+      "--group-by paths"
+    ];
+    timerConfig = {
+      OnCalendar = "03:00";
+      RandomizedDelaySec = "30m";
+      Persistent = true;
+    };
+  };
+
   # /home 时间线快照（容器数据全部 bind mount 在此）：误删/误改的兜底。
   # 保留策略克制：bees 的去重开销随快照数增长，快照也会钉住已删数据。
   # 首次启用前需手动：btrfs subvolume create /home/.snapshots
