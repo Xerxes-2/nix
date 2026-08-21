@@ -28,10 +28,9 @@ in
     efiSysMountPoint = "/boot/efi";
   };
 
-  # 【上次失败根因】NIXOS_LUSTRATE 只有脚本版 stage-1 实现；
-  # systemd 版 initrd（unstable 默认）会静默跳过 lustrate，
-  # 导致 NixOS 叠在完整 Ubuntu 根上启动。迁移完成后可改回 true。
-  boot.initrd.systemd.enable = false;
+  # 迁移期间曾设为 false（NIXOS_LUSTRATE 只有脚本版 stage-1 实现）；
+  # lustrate 已完成，改回 unstable 默认的 systemd stage-1。
+  boot.initrd.systemd.enable = true;
 
   # 保留 OCI 串口控制台（救援通道）
   boot.kernelParams = [ "console=tty1" "console=ttyAMA0" ];
