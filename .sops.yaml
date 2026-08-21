@@ -1,0 +1,13 @@
+# sops-nix 密钥策略
+# - host_oci: 由 /etc/ssh/ssh_host_ed25519_key 派生（ssh-to-age），主机启动时解密
+# - admin:    ubuntu@oci 的 ~/.config/sops/age/keys.txt（已提醒异地备份），用于编辑
+# 编辑: nix shell nixpkgs#sops -c sops secrets/oci.yaml
+keys:
+  - &host_oci age1hglsm6dc66ntwxxn0zj5kavleff47ld5eah675pmvmn7vz38n36qs20l3e
+  - &admin age1hdwxv07dps7kkxl4uggrgn8ygtsgslvlwmvhnyd6tcr6zecs3qzsvc7rc3
+creation_rules:
+  - path_regex: secrets/.*\.yaml$
+    key_groups:
+      - age:
+          - *host_oci
+          - *admin

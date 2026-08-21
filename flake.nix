@@ -7,9 +7,13 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
+    sops-nix = {
+      url = "github:Mic92/sops-nix";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
   };
 
-  outputs = { self, nixpkgs-unstable, home-manager, ... }:
+  outputs = { self, nixpkgs-unstable, home-manager, sops-nix, ... }:
     let
       system = "aarch64-linux";
     in
@@ -19,6 +23,7 @@
         inherit system;
         modules = [
           home-manager.nixosModules.home-manager
+          sops-nix.nixosModules.sops
           ./modules/unfree.nix
           ./hosts/oci/configuration.nix
           ./hosts/oci/home.nix

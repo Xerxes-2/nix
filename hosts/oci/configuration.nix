@@ -120,10 +120,26 @@ in
       "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDUmTvXl/5tGe4e+alerNLGctJvGjeIWIrq3TeTitCUF2LLuWF49ea7j5XocB5TpBP1KcjXuzUuD0qBBrOdnKC0oX781MbiwdHSf0Cl6R5ZocyJl9Oxsu2Szjxq6Gkhw5u6dumbQHMV9fcPVSHDDuuSBjD3Cc0T1lPOUd3x2FJjebFEVDESXFJPZfKbzAgcBdxccl2T3lqEJ5RX8PeZ4RFK6yB+6G8jaqq8I4IoZU0P0toI568eRm3exGg8MtafY0kWk/FAuCRgmw+dQb2GjwPwP7cHprupbZNRkZaS/v5YJGudMXsa7nTGqQXyt5wAzPpTbvkkJbLhvhb35wN3eeFZ oracle"
     ];
     # 哈希由切换向导写入，lustrate 白名单保留 etc/secrets（mutableUsers 下仅首次建用户时生效）
-    hashedPasswordFile = "/etc/secrets/ubuntu.hash";
+    hashedPasswordFile = config.sops.secrets."ubuntu-hash".path;
   };
   # 串口控制台救援登录用，同上由向导写入
-  users.users.root.hashedPasswordFile = "/etc/secrets/root.hash";
+  users.users.root.hashedPasswordFile = config.sops.secrets."root-hash".path;
+
+  # sops-nix：secrets 加密进 git（secrets/oci.yaml），主机 ssh ed25519 key 解密。
+  # 密码哈希需 neededForUsers（用户创建早于常规 secrets 挂载）。
+  # 旧 /etc/secrets/ 观察期后可删。
+  sops = {
+    defaultSopsFile = ../../secrets/oci.yaml;
+    age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
+    secrets = {
+      "ubuntu-hash".neededForUsers = true;
+      "root-hash".neededForUsers = true;
+      "cloudflared-env" = { };
+      "wakapi-env" = { };
+      "restic-env" = { };
+      "restic-password" = { };
+    };
+  };
 
   # 与现状一致：ssh 仅密钥登录，sudo 免密（密码仅串口救援登录用）
   security.sudo.wheelNeedsPassword = false;
@@ -172,10 +188,10 @@ in
 
   # wakapi 原生服务（从 rootless 容器迁入，2026-08）。DynamicUser，
   # 数据在 /var/lib/private/wakapi/wakapi.db（/var/lib/wakapi 是 symlink）。
-  # salt 必须与容器时代一致（密码哈希依赖它）：/etc/secrets/wakapi.env
+  # salt 必须与容器时代一致（密码哈希依赖它）：sops wakapi-env
   services.wakapi = {
     enable = true;
-    environmentFiles = [ "/etc/secrets/wakapi.env" ];
+    environmentFiles = [ config.sops.secrets."wakapi-env".path ];
     settings = {
       server = {
         listen_ipv4 = "127.0.0.1";
@@ -213,11 +229,11 @@ in
   # restic 每日异地备份→ OCI Object Storage（复用 Ubuntu 时代的 vps-backup 仓库）。
   # 旧快照 host=OCI-Ubuntu-arm，新的 host=oci；forget 按 paths 分组，
   # 路径集不变故旧快照会随保留策略自然淘汰。
-  # 凭据：/etc/secrets/restic.{password,env}（见 MIGRATION.md 的命令式 secrets 惯例）。
+  # 凭据：sops restic-password / restic-env。
   services.restic.backups.oci = {
     repository = "s3:https://REDACTED.compat.objectstorage.ap-sydney-1.oraclecloud.com/vps-backup";
-    passwordFile = "/etc/secrets/restic.password";
-    environmentFile = "/etc/secrets/restic.env";
+    passwordFile = config.sops.secrets."restic-password".path;
+    environmentFile = config.sops.secrets."restic-env".path;
     paths = [
       "/home/ubuntu/dufs-data"
       "/var/lib/private/wakapi"
@@ -284,9 +300,7 @@ in
   };
 
   # cloudflared tunnel（token 方式）。
-  # TODO(Phase 3 前必做): 创建 /etc/secrets/cloudflared.env，内容一行:
-  #   TUNNEL_TOKEN=eyJhIjoi...（原 unit 里的 token）
-  # chmod 600 / chown root。lustrate 白名单里有 etc/secrets，会保留。
+  # token：sops cloudflared-env（TUNNEL_TOKEN=...）。
   systemd.services.cloudflared = {
     description = "cloudflared tunnel";
     wantedBy = [ "multi-user.target" ];
@@ -295,7 +309,7 @@ in
     serviceConfig = {
       Type = "notify";
       TimeoutStartSec = 15;
-      EnvironmentFile = "/etc/secrets/cloudflared.env";
+      EnvironmentFile = config.sops.secrets."cloudflared-env".path;
       ExecStart = "${pkgs.cloudflared}/bin/cloudflared --no-autoupdate tunnel run";
       Restart = "on-failure";
       RestartSec = "5s";
