@@ -1,5 +1,10 @@
 # OCI VM 原地迁移 NixOS 计划（NIXOS_LUSTRATE）
 
+> **状态：✅ 已完成（2026-08-21）**。首次尝试因 systemd stage-1 不支持 lustrate 失败，
+> 从启动卷备份恢复为新实例后修复（`boot.initrd.systemd.enable = false` +
+> `efiInstallAsRemovable`），二次切换成功。apt 用户包已迁移，bees/mosh 已启用。
+> 本文档与 `scripts/nixos-cutover.sh` 保留作历史参考。
+
 > 决策：LUSTRATE 原地迁移 / quadlet-nix 管容器 / nixos-unstable / NixOS 自带 Nix
 >
 > 执行：Phase 0 剩余手工步骤 + Phase 3 已封装为交互式向导 `scripts/nixos-cutover.sh`，
