@@ -22,25 +22,6 @@
         autoUpdate.enable = true; # 对应原 podman-auto-update.timer
 
         containers = {
-          dufs = {
-            autoStart = true;
-            unitConfig.Description = "dufs file server";
-            serviceConfig = {
-              Restart = "on-failure";
-              TimeoutStopSec = "70";
-            };
-            containerConfig = {
-              image = "docker.io/sigoden/dufs:latest";
-              name = "dufs";
-              autoUpdate = "registry";
-              publishPorts = [ "127.0.0.1:5000:5000" ];
-              volumes = [
-                "${home}/.config/dufs/config.yaml:/config.yaml:ro"
-                "${home}/dufs-data:/data:rw"
-              ];
-              exec = "-c /config.yaml";
-            };
-          };
 
           sillytavern = {
             autoStart = true;
