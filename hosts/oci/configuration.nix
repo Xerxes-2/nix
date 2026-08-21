@@ -83,11 +83,6 @@ in
     fsType = "btrfs";
     options = btrfsOpts "/@tmp";
   };
-  fileSystems."/home/ubuntu/.local/share/containers" = {
-    device = "/dev/disk/by-uuid/${btrfsUuid}";
-    fsType = "btrfs";
-    options = btrfsOpts "/@containers";
-  };
   fileSystems."/boot" = {
     device = "/dev/disk/by-uuid/71551c63-1196-417c-b4ce-2898a9c58004";
     fsType = "ext4";
@@ -121,10 +116,6 @@ in
     extraGroups = [ "wheel" ];
     shell = pkgs.fish;
     linger = true; # 开机即拉起 user 服务（容器）
-    # 关键：钉死原 subuid/subgid range，rootless 容器 :U 卷的文件属主依赖它
-    autoSubUidGidRange = false;
-    subUidRanges = [ { startUid = 165536; count = 65536; } ];
-    subGidRanges = [ { startGid = 165536; count = 65536; } ];
     openssh.authorizedKeys.keys = [
       "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDUmTvXl/5tGe4e+alerNLGctJvGjeIWIrq3TeTitCUF2LLuWF49ea7j5XocB5TpBP1KcjXuzUuD0qBBrOdnKC0oX781MbiwdHSf0Cl6R5ZocyJl9Oxsu2Szjxq6Gkhw5u6dumbQHMV9fcPVSHDDuuSBjD3Cc0T1lPOUd3x2FJjebFEVDESXFJPZfKbzAgcBdxccl2T3lqEJ5RX8PeZ4RFK6yB+6G8jaqq8I4IoZU0P0toI568eRm3exGg8MtafY0kWk/FAuCRgmw+dQb2GjwPwP7cHprupbZNRkZaS/v5YJGudMXsa7nTGqQXyt5wAzPpTbvkkJbLhvhb35wN3eeFZ oracle"
     ];
@@ -136,9 +127,6 @@ in
 
   # 与现状一致：ssh 仅密钥登录，sudo 免密（密码仅串口救援登录用）
   security.sudo.wheelNeedsPassword = false;
-
-  # rootless quadlet 需要系统层显式开启（装 podman + systemd user generator）
-  virtualisation.quadlet.enable = true;
 
   programs.fish.enable = true;
   programs.nix-ld.enable = true; # 兼容家目录里非 nix 编译的二进制
