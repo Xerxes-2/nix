@@ -32,6 +32,9 @@ in
   # lustrate 已完成，改回 unstable 默认的 systemd stage-1。
   boot.initrd.systemd.enable = true;
 
+  # 最新主线内核（启动失败可在 GRUB 选上一代回滚）
+  boot.kernelPackages = pkgs.linuxPackages_latest;
+
   # 保留 OCI 串口控制台（救援通道）
   boot.kernelParams = [ "console=tty1" "console=ttyAMA0" ];
 
