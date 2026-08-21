@@ -1,11 +1,16 @@
 {
-  description = "ubuntu 服务器的 CLI 工具集（声明式包管理）";
+  description = "OCI 服务器：CLI 工具集（声明式包管理）+ NixOS 系统配置";
 
   inputs = {
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
+    home-manager = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+    quadlet-nix.url = "github:SEIAROTg/quadlet-nix";
   };
 
-  outputs = { nixpkgs-unstable, ... }:
+  outputs = { nixpkgs-unstable, home-manager, quadlet-nix, ... }:
     let
       system = "aarch64-linux";
       # claude-code 是 unfree 许可证,需要显式放行
@@ -49,6 +54,17 @@
           wakatime-cli
           yazi
           zellij
+        ];
+      };
+
+      nixosConfigurations.oci = nixpkgs-unstable.lib.nixosSystem {
+        inherit system;
+        specialArgs = { inherit quadlet-nix; };
+        modules = [
+          quadlet-nix.nixosModules.quadlet
+          home-manager.nixosModules.home-manager
+          ./hosts/oci/configuration.nix
+          ./hosts/oci/containers.nix
         ];
       };
     };
