@@ -13,7 +13,14 @@
     };
   };
 
-  outputs = { self, nixpkgs-unstable, home-manager, sops-nix, ... }:
+  outputs =
+    {
+      self,
+      nixpkgs-unstable,
+      home-manager,
+      sops-nix,
+      ...
+    }:
     let
       system = "aarch64-linux";
     in

@@ -5,7 +5,9 @@
 # 因此 oci 只在 NixOS 层（flake.nix 的 modules 列表）导入本文件。
 { lib, ... }:
 {
-  nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
-    "claude-code"
-  ];
+  nixpkgs.config.allowUnfreePredicate =
+    pkg:
+    builtins.elem (lib.getName pkg) [
+      "claude-code"
+    ];
 }
