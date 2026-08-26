@@ -60,7 +60,6 @@ in
     alacritty
     brightnessctl
     firefox
-    fuzzel
     grim
     nautilus
     networkmanagerapplet

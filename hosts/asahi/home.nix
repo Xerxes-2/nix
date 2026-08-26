@@ -14,6 +14,21 @@
         # Reserve the exact center for the 14-inch MacBook Pro notch. Keep DMS
         # widgets in edge-anchored groups so they flow inward from both sides.
         # This is a one-time migration; later UI changes remain mutable.
+        home.activation.dmsLauncherBind = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+          config="$HOME/.config/niri/config.kdl"
+          marker="$HOME/.local/state/DankMaterialShell/.launcher-bind-v1"
+
+          if [ ! -e "$marker" ]; then
+            mkdir -p "$(dirname "$marker")"
+            if [ -f "$config" ]; then
+              sed -i \
+                's|Mod+D hotkey-overlay-title="Run an Application: fuzzel" { spawn "fuzzel"; }|Mod+D hotkey-overlay-title="Run an Application: DMS" { spawn "dms" "ipc" "call" "spotlight" "toggle"; }|' \
+                "$config"
+            fi
+            touch "$marker"
+          fi
+        '';
+
         home.activation.dmsNotchLayout = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           settings="$HOME/.config/DankMaterialShell/settings.json"
           marker="$HOME/.local/state/DankMaterialShell/.notch-layout-v3"
