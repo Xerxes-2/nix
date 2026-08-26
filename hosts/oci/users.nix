@@ -6,6 +6,12 @@
   ...
 }:
 {
+  # 声明即真相：mutableUsers=true 时 hashedPasswordFile 对已存在的用户不生效
+  # （参 nixpkgs update-users-groups.pl：`if ... && !$spec->{mutableUsers}`），
+  # 改 sops 里的哈希不会落地，必须手工 chpasswd——配置变成了“许愿”。
+  # 代价：不能再用 passwd 交互改密码，改密码必须走 sops + rebuild。
+  users.mutableUsers = false;
+
   users.groups.ubuntu.gid = 1001;
   users.users.ubuntu = {
     isNormalUser = true;
@@ -20,7 +26,6 @@
       # asahi (Apple Silicon MacBook)
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMJYY+oB7f+EX9rSf/KhnBmL0v9fOqMYDIwolS14ap+ xerxes2@asahi->oci 2026-08"
     ];
-    # 哈希由切换向导写入，lustrate 白名单保留 etc/secrets（mutableUsers 下仅首次建用户时生效）
     hashedPasswordFile = config.sops.secrets."ubuntu-hash".path;
   };
   # 串口控制台救援登录用。密文在公开仓库里，故必须是随机长密码 + yescrypt
