@@ -8,6 +8,10 @@
 {
   services.openssh = {
     enable = true;
+    # 只信任 /etc/ssh/authorized_keys.d/（即 users.users.*.openssh.authorizedKeys.keys）。
+    # 默认还会读 ~/.ssh/authorized_keys，而那里残留的旧钥会静默绕过声明式配置
+    # （迁移时写的兜底副本就造成过这个问题，2026-08 发现并清理）。
+    authorizedKeysInHomedir = false;
     settings = {
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
