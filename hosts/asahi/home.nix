@@ -1,8 +1,19 @@
-{ ... }:
+{ lib, pkgs, ... }:
+let
+  display = import ./display.nix { inherit lib; };
+
+  dmsSettings = (pkgs.formats.json { }).generate "settings.json" (
+    import ./dms/settings.nix { inherit display; }
+  );
+in
 {
   home-manager = {
     useGlobalPkgs = true;
     useUserPackages = true;
+
+    # niri writes a default config.kdl on first start; keep that copy around
+    # when home-manager takes the file over.
+    backupFileExtension = "hm-backup";
 
     users.xerxes2 =
       { lib, pkgs, ... }:
@@ -11,62 +22,20 @@
 
         programs.home-manager.enable = true;
 
-        # Reserve the exact center for the 14-inch MacBook Pro notch. Keep DMS
-        # widgets in edge-anchored groups so they flow inward from both sides.
-        # This is a one-time migration; later UI changes remain mutable.
-        home.activation.dmsLauncherBind = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-          config="$HOME/.config/niri/config.kdl"
-          marker="$HOME/.local/state/DankMaterialShell/.launcher-bind-v1"
+        # niri's config is fully declarative: it is the upstream template with
+        # the DMS integration applied (DMS launcher, lock screen, audio,
+        # brightness and media keys go through `dms ipc`, no waybar autostart).
+        # The output scale comes from display.nix, which also sizes the DMS
+        # notch spacer.
+        xdg.configFile."niri/config.kdl".source = pkgs.replaceVars ./niri/config.kdl {
+          scale = display.scaleText;
+        };
 
-          if [ ! -e "$marker" ]; then
-            mkdir -p "$(dirname "$marker")"
-            if [ -f "$config" ]; then
-              sed -i \
-                's|Mod+D hotkey-overlay-title="Run an Application: fuzzel" { spawn "fuzzel"; }|Mod+D hotkey-overlay-title="Run an Application: DMS" { spawn "dms" "ipc" "call" "spotlight" "toggle"; }|' \
-                "$config"
-            fi
-            touch "$marker"
-          fi
-        '';
-
-        # The niri template still points at tools DMS replaces: swaylock, wpctl,
-        # playerctl, brightnessctl and a waybar autostart (waybar isn't even
-        # installed). Route them through DMS so its OSDs and lock screen are
-        # used. One-time migration; the config stays editable afterwards.
-        home.activation.dmsNiriBinds = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-          config="$HOME/.config/niri/config.kdl"
-          marker="$HOME/.local/state/DankMaterialShell/.dms-binds-v1"
-
-          if [ ! -e "$marker" ]; then
-            mkdir -p "$(dirname "$marker")"
-            if [ -f "$config" ]; then
-              sed -i \
-                -e 's|^// This line starts waybar.*|// The bar is part of DMS (dms.service), started with the session.|' \
-                -e '/^spawn-at-startup "waybar"$/d' \
-                -e 's|Lock the Screen: swaylock" { spawn "swaylock"; }|Lock the Screen: DMS" { spawn "dms" "ipc" "call" "lock" "lock"; }|' \
-                -e 's|^    // Example volume keys mappings for PipeWire & WirePlumber.$|    // Volume keys go through DMS so its on-screen display shows up.|' \
-                -e 's|^    // "-l 1.0" limits the volume to 100%.$|    // DMS clamps the volume to its own configured maximum.|' \
-                -e 's|{ spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1+ -l 1.0"; }|{ spawn "dms" "ipc" "call" "audio" "increment" "5"; }|' \
-                -e 's|{ spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1-"; }|{ spawn "dms" "ipc" "call" "audio" "decrement" "5"; }|' \
-                -e 's|{ spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"; }|{ spawn "dms" "ipc" "call" "audio" "mute"; }|' \
-                -e 's|{ spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"; }|{ spawn "dms" "ipc" "call" "audio" "micmute"; }|' \
-                -e 's|^    // Example media keys mapping using playerctl.$|    // Media keys drive the MPRIS player DMS is tracking.|' \
-                -e 's|{ spawn-sh "playerctl play-pause"; }|{ spawn "dms" "ipc" "call" "mpris" "playPause"; }|' \
-                -e 's|{ spawn-sh "playerctl stop"; }|{ spawn "dms" "ipc" "call" "mpris" "stop"; }|' \
-                -e 's|{ spawn-sh "playerctl previous"; }|{ spawn "dms" "ipc" "call" "mpris" "previous"; }|' \
-                -e 's|{ spawn-sh "playerctl next"; }|{ spawn "dms" "ipc" "call" "mpris" "next"; }|' \
-                -e 's|^    // Example brightness key mappings for brightnessctl.$|    // Brightness keys go through DMS (shell OSD + logind backlight).|' \
-                -e 's|{ spawn "brightnessctl" "--class=backlight" "set" "+10%"; }|{ spawn "dms" "ipc" "call" "brightness" "increment" "5" ""; }|' \
-                -e 's|{ spawn "brightnessctl" "--class=backlight" "set" "10%-"; }|{ spawn "dms" "ipc" "call" "brightness" "decrement" "5" ""; }|' \
-                "$config"
-            fi
-            touch "$marker"
-          fi
-        '';
-
+        # Seed the notch-aware DMS bar layout. This is a one-time migration:
+        # DMS owns settings.json at runtime, so later UI changes stay.
         home.activation.dmsNotchLayout = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           settings="$HOME/.config/DankMaterialShell/settings.json"
-          marker="$HOME/.local/state/DankMaterialShell/.notch-layout-v3"
+          marker="$HOME/.local/state/DankMaterialShell/.notch-layout-v4"
 
           if [ ! -e "$marker" ]; then
             mkdir -p "$(dirname "$settings")" "$(dirname "$marker")"
@@ -77,6 +46,8 @@
                 | .iconThemeLight = "Adwaita"
                 | .barConfigs[0].position = 0
                 | .barConfigs[0].spacing = 0
+                | .barConfigs[0].innerPadding = ${toString display.innerPadding}
+                | .barConfigs[0].bottomGap = 0
                 | .barConfigs[0].transparency = 1.0
                 | .barConfigs[0].backgroundColor = "#000000"
                 | .barConfigs[0].squareCorners = true
@@ -87,7 +58,7 @@
                     "music"
                   ]
                 | .barConfigs[0].centerWidgets = [
-                    { "id": "spacer", "size": 220 }
+                    { "id": "spacer", "size": ${toString display.spacerSize} }
                   ]
                 | .barConfigs[0].rightWidgets = [
                     "clock",
@@ -103,7 +74,7 @@
               install -m 0600 "$tmp" "$settings"
               rm -f "$tmp"
             else
-              install -m 0600 ${./dms/settings.json} "$settings"
+              install -m 0600 ${dmsSettings} "$settings"
             fi
 
             # DMS only applies these files when the theme is changed through

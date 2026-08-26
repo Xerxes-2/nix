@@ -1,5 +1,16 @@
-{ inputs, pkgs, ... }:
+{
+  inputs,
+  lib,
+  pkgs,
+  ...
+}:
 let
+  display = import ./display.nix { inherit lib; };
+
+  dmsSettings = (pkgs.formats.json { }).generate "settings.json" (
+    import ./dms/settings.nix { inherit display; }
+  );
+
   # DMS currently has no per-bar background-color setting. Add one while
   # preserving its normal themed background as the fallback.
   dmsShell = pkgs.dms-shell.overrideAttrs (old: {
@@ -33,7 +44,7 @@ in
       enable = true;
       compositor.name = "niri";
       configHome = "/home/xerxes2";
-      configFiles = [ ./dms/settings.json ];
+      configFiles = [ dmsSettings ];
     };
   };
 
