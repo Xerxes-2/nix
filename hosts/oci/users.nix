@@ -25,6 +25,8 @@
     openssh.authorizedKeys.keys = [
       # asahi (Apple Silicon MacBook)
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMJYY+oB7f+EX9rSf/KhnBmL0v9fOqMYDIwolS14ap+ xerxes2@asahi->oci 2026-08"
+      # cachyos (x86_64)
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIOTESA/rYKuqMWmrKy5iUHn8gOMpi3g4TPOAAzf8Trc xerxes2@cachyos->oci 2026-08"
     ];
     hashedPasswordFile = config.sops.secrets."ubuntu-hash".path;
   };
