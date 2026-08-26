@@ -17,6 +17,7 @@
     nix-index
     nodejs-slim
     osv-scanner
+    pi-coding-agent
     pnpm
     powershell
     procs
