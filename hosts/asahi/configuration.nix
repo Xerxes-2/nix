@@ -5,6 +5,7 @@
     # Run `sudo nixos-generate-config --show-hardware-config | tee hardware-configuration.nix`
     # and uncomment this line.
     ./hardware-configuration.nix
+    ./gui.nix
   ];
 
   boot = {
