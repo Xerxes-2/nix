@@ -379,6 +379,15 @@ binds {
     XF86MonBrightnessUp allow-when-locked=true { spawn "dms" "ipc" "call" "brightness" "increment" "5" ""; }
     XF86MonBrightnessDown allow-when-locked=true { spawn "dms" "ipc" "call" "brightness" "decrement" "5" ""; }
 
+    // Keyboard backlight. Same DMS brightness API, but addressed at the LED
+    // device (`dms ipc call brightness list`) instead of the panel backlight.
+    // The 2021 MacBook Pro dropped the dedicated keys, so Mod+F5/F6 are bound
+    // as well - XF86KbdBrightness* only arrives on keyboards that have them.
+    XF86KbdBrightnessUp allow-when-locked=true { spawn "dms" "ipc" "call" "brightness" "increment" "10" "leds:kbd_backlight"; }
+    XF86KbdBrightnessDown allow-when-locked=true { spawn "dms" "ipc" "call" "brightness" "decrement" "10" "leds:kbd_backlight"; }
+    Mod+F6 allow-when-locked=true hotkey-overlay-title="Keyboard Backlight Up" { spawn "dms" "ipc" "call" "brightness" "increment" "10" "leds:kbd_backlight"; }
+    Mod+F5 allow-when-locked=true hotkey-overlay-title="Keyboard Backlight Down" { spawn "dms" "ipc" "call" "brightness" "decrement" "10" "leds:kbd_backlight"; }
+
     // Open/close the Overview: a zoomed-out view of workspaces and windows.
     // You can also move the mouse into the top-left hot corner,
     // or do a four-finger swipe up on a touchpad.
