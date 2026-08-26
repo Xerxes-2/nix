@@ -3,6 +3,14 @@
 
   inputs = {
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixos-apple-silicon = {
+      url = "github:tpwrules/nixos-apple-silicon";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+    asahi-firmware = {
+      url = "path:/boot/vendorfw";
+      flake = false;
+    };
     home-manager = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
@@ -20,7 +28,7 @@
       home-manager,
       sops-nix,
       ...
-    }:
+    }@inputs:
     let
       system = "aarch64-linux";
     in
@@ -39,6 +47,12 @@
 
       # 主机名别名：本机上 `nixos-rebuild switch --flake ~/nixcfg` 可省略 #oci
       nixosConfigurations."instance-20260821-1942" = self.nixosConfigurations.oci;
+
+      nixosConfigurations.asahi = nixpkgs-unstable.lib.nixosSystem {
+        inherit system;
+        specialArgs = { inherit inputs; };
+        modules = [ ./hosts/asahi/configuration.nix ];
+      };
 
       # MacBook（Apple Silicon，Determinate Nix）：standalone home-manager 入口。
       # 使用：nix run home-manager -- switch --flake ~/nixcfg#xerxes2

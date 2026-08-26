@@ -1,5 +1,33 @@
 {
   "nodes": {
+    "asahi-firmware": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1787698274,
+        "narHash": "sha256-M9C+tAHCVcUDwNcA+BizzHHrxxxTAG2chD5Lp1hDbYo=",
+        "path": "/boot/vendorfw",
+        "type": "path"
+      },
+      "original": {
+        "path": "/boot/vendorfw",
+        "type": "path"
+      }
+    },
+    "flake-compat": {
+      "locked": {
+        "lastModified": 1761640442,
+        "narHash": "sha256-AtrEP6Jmdvrqiv4x2xa5mrtaIp3OEe8uBYCDZDS+hu8=",
+        "owner": "nix-community",
+        "repo": "flake-compat",
+        "rev": "4a56054d8ffc173222d09dad23adf4ba946c8884",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "flake-compat",
+        "type": "github"
+      }
+    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -17,6 +45,27 @@
       "original": {
         "owner": "nix-community",
         "repo": "home-manager",
+        "type": "github"
+      }
+    },
+    "nixos-apple-silicon": {
+      "inputs": {
+        "flake-compat": "flake-compat",
+        "nixpkgs": [
+          "nixpkgs-unstable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1786862401,
+        "narHash": "sha256-zRPYCn5RJWxr9uyUwNIQjPsTFcIFRwuRnI91dqvGA0k=",
+        "owner": "tpwrules",
+        "repo": "nixos-apple-silicon",
+        "rev": "53798a0eb0fa4c8cfaeca7bdc5b4ad22ed210c95",
+        "type": "github"
+      },
+      "original": {
+        "owner": "tpwrules",
+        "repo": "nixos-apple-silicon",
         "type": "github"
       }
     },
@@ -38,7 +87,9 @@
     },
     "root": {
       "inputs": {
+        "asahi-firmware": "asahi-firmware",
         "home-manager": "home-manager",
+        "nixos-apple-silicon": "nixos-apple-silicon",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "sops-nix": "sops-nix"
       }
