@@ -16,7 +16,7 @@
         # This is a one-time migration; later UI changes remain mutable.
         home.activation.dmsNotchLayout = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           settings="$HOME/.config/DankMaterialShell/settings.json"
-          marker="$HOME/.local/state/DankMaterialShell/.notch-layout-v2"
+          marker="$HOME/.local/state/DankMaterialShell/.notch-layout-v3"
 
           if [ ! -e "$marker" ]; then
             mkdir -p "$(dirname "$settings")" "$(dirname "$marker")"
@@ -26,6 +26,10 @@
                 .iconThemeDark = "Adwaita"
                 | .iconThemeLight = "Adwaita"
                 | .barConfigs[0].position = 0
+                | .barConfigs[0].spacing = 0
+                | .barConfigs[0].transparency = 1.0
+                | .barConfigs[0].backgroundColor = "#000000"
+                | .barConfigs[0].squareCorners = true
                 | .barConfigs[0].leftWidgets = [
                     "launcherButton",
                     "workspaceSwitcher",

@@ -1,8 +1,23 @@
 { inputs, pkgs, ... }:
+let
+  # DMS currently has no per-bar background-color setting. Add one while
+  # preserving its normal themed background as the fallback.
+  dmsShell = pkgs.dms-shell.overrideAttrs (old: {
+    postInstall = (old.postInstall or "") + ''
+      substituteInPlace $out/share/quickshell/dms/Modules/DankBar/DankBarWindow.qml \
+        --replace-fail \
+          'readonly property color _surfaceContainer: Theme.surfaceContainer' \
+          'readonly property color _surfaceContainer: barConfig?.backgroundColor ?? Theme.surfaceContainer'
+    '';
+  });
+in
 {
   # Wayland compositor + desktop shell.
   programs.niri.enable = true;
-  programs.dms-shell.enable = true;
+  programs.dms-shell = {
+    enable = true;
+    package = dmsShell;
+  };
 
   # Give Qt applications (including DMS/Quickshell) a real platform theme so
   # named system-tray icons are resolved through the selected icon theme.
