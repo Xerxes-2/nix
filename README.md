@@ -1,18 +1,49 @@
 # nixcfg — 多机 Nix 配置
 
-一台 NixOS 服务器（`oci`）+ 一台装了 Nix 的 MacBook（`xerxes2`），全部由 `flake.nix` 声明式管理。
+三个部署目标，全部由 `flake.nix` 声明式管理：
+
+| 目标 | 是什么 | 怎么管 |
+|---|---|---|
+| `oci` | Oracle Cloud 的 aarch64 服务器 | NixOS + Home Manager |
+| `asahi` | 14" MacBook Pro (M2 Pro) 上的 Asahi Linux | NixOS + Home Manager |
+| `xerxes2` | **同一台 MacBook 的 macOS 侧** | standalone Home Manager |
+
+`asahi` 和 `xerxes2` 是同一台物理机器的两个系统——Asahi Linux 必须与 macOS 双启动，
+所以 macOS 那边也顺手纳入管理，共用 `modules/home/cli.nix` 那套 CLI 工具。
+
 **不要再用 `nix profile install nixpkgs#xxx` 散装**，否则机器状态会漂移。
+
+## 仓库位置与版本控制
+
+两台 NixOS 机器上都在 **`/etc/nixos`**，都用 **jj**（colocated，git 作为后端）。
+
+`git log` / `git branch` 能看，但**不要用 git 改**：colocated 仓库的 git HEAD 永远是
+detached 的，那是 jj 的正常状态而非故障，用 `git checkout` / `git reset` 去"修"会和
+jj 的工作副本打架。
 
 ## 结构
 
 ```
-├── flake.nix               # 入口：定义 oci / xerxes2 两台机器
+├── flake.nix               # 入口：定义 oci / asahi / xerxes2
 ├── hosts/oci/
 │   ├── configuration.nix   # NixOS 入口，imports 下面的模块
 │   ├── boot.nix filesystems.nix network.nix users.nix packages.nix
 │   ├── services/           # wakapi / sillytavern / restic / cloudflared / misc
 │   ├── home.nix            # ubuntu 用户的 Home Manager（含 dufs）
 │   └── sillytavern.yaml    # SillyTavern 配置（无机密，进 git）
+├── hosts/asahi/
+│   ├── configuration.nix   # NixOS 入口，imports 下面的模块
+│   ├── hardware-configuration.nix   # 生成的，别手改
+│   ├── filesystems.nix     # btrfs 压缩/挂载选项，叠加在上面那份之上
+│   ├── power.nix           # zswap / 电池上限 / 电源键 / systemd-oomd
+│   ├── gui.nix             # niri + DMS + 音频 + 字体
+│   ├── display.nix         # 内屏刘海几何的唯一真相，缩放改这里
+│   ├── input.nix           # fcitx5 双拼
+│   ├── containers.nix      # podman / distrobox
+│   ├── niri/config.kdl     # 声明式的 niri 配置
+│   ├── dms/settings.nix    # DMS 首次启动的初始布局
+│   ├── home.nix            # xerxes2 用户的 Home Manager
+│   └── steam/              # Fedora Asahi 游戏栈容器（FEX + muvm），见其 README
 ├── modules/
 │   ├── home/cli.nix        # 跨机器共享的 CLI 工具集
 │   └── unfree.nix          # unfree 包白名单
@@ -27,55 +58,112 @@
 |---|---|
 | 所有机器都要的 CLI 工具（git、htop、bat、yazi…） | `modules/home/cli.nix` |
 | 仅 oci 用户需要的工具（btdu…） | `hosts/oci/home.nix` |
-| oci 服务器/btrfs 专用或须系统级的包（compsize、kitty.terminfo…） | `hosts/oci/packages.nix` 的 `environment.systemPackages` |
+| oci 服务器/btrfs 专用或须系统级的包 | `hosts/oci/packages.nix` |
+| asahi 的 GUI 程序、字体 | `hosts/asahi/gui.nix` |
+| asahi 的输入法相关 | `hosts/asahi/input.nix` |
 
 找包名：https://search.nixos.org 或 `nix search nixpkgs xxx`。
 
 ## 应用变更
 
-oci（NixOS，系统 + Home Manager 一起）：
+两台 NixOS 机器的主机名都能对上 flake 里的 attribute（`asahi` 直接同名；oci 的真实
+主机名 `instance-20260821-1942` 在 `flake.nix` 里做了别名），所以 `#target` 可以省略：
+
 ```bash
-cd ~/nixcfg
-nixos-rebuild switch --flake .#oci
-# 本机上已设主机名别名，`--flake ~/nixcfg` 或 `--flake .` 亦可
+sudo nixos-rebuild switch --flake /etc/nixos          # 本机
 ```
 
-xerxes2（Mac，standalone home-manager）：
+xerxes2（macOS 侧，standalone home-manager）：
 ```bash
-nix run home-manager -- switch --flake ~/nixcfg#xerxes2
+nix run home-manager -- switch --flake /etc/nixos#xerxes2
 ```
 
-> 用 `sudo nixos-rebuild` 时 `~` 会展开成 `/root`，务必写绝对路径
-> `/home/ubuntu/nixcfg#oci`。
+> 用 `sudo` 时 `~` 会展开成 `/root`，写绝对路径 `/etc/nixos`。
+
+## 在另一台机器上同步
+
+改动推上去之后，到另一台机器：
+
+```bash
+cd /etc/nixos
+jj git fetch
+jj new main                                    # 或 jj edit main
+sudo nixos-rebuild switch --flake /etc/nixos
+```
+
+**不要用 `git pull`**。它在 colocated 仓库里能跑，但绕过了 jj——jj 只能在下一条命令时
+被动 import 并重置工作副本，属于让它替你兜底。
+
+想先确认这次 switch 会动什么：
+
+```bash
+nix build --no-link --print-out-paths .#nixosConfigurations.oci.config.system.build.toplevel
+nix store diff-closures /run/current-system <上面那个路径>
+```
 
 ## 升级全部包
 
 ```bash
-cd ~/nixcfg
-nix flake update          # 更新锁文件（nixpkgs 到最新 weekly）
-nixos-rebuild switch --flake .#oci
+cd /etc/nixos
+nix flake update          # 更新锁文件（nixpkgs 到最新 unstable）
+sudo nixos-rebuild switch --flake /etc/nixos
+```
+
+asahi 的内核来自 `nixos-apple-silicon`，上游**没有 binary cache**（见其
+`docs/binary-cache.md`），所以 nixpkgs 一动就要本地编内核，几十分钟起步。
+
+## 更新 Asahi 固件
+
+`asahi-firmware` 是一个 `path:/boot/vendorfw` 输入，内容被 flake.lock 按哈希锁住。
+在 macOS 侧跑过 Asahi 安装器的 "Rebuild vendor firmware package" 之后，必须重新锁定
+才会生效：
+
+```bash
+nix flake update asahi-firmware
+sudo nixos-rebuild switch --flake /etc/nixos
 ```
 
 ## 回滚
 
 ```bash
-nixos-rebuild switch --rollback    # 回到上一代系统配置
-# 或 jj/git 层面回退 flake.lock 后重建
+sudo nixos-rebuild switch --rollback    # 回到上一代系统配置
+# 或在 jj 层面回退 flake.lock 后重建
 ```
+
+注意 asahi 上 `boot.loader.systemd-boot.configurationLimit = 5`：ESP 只有 504M，
+能回滚的代数就这么多，更早的已经从启动菜单里清掉了。
 
 ## 换新机器还原
 
 ```bash
-git clone <本仓库> ~/nixcfg      # jj 仓库兼容 git clone
-cd ~/nixcfg
-nixos-rebuild switch --flake .#oci
+sudo jj git clone --colocate https://github.com/Xerxes-2/nix.git /etc/nixos
+sudo nixos-rebuild switch --flake /etc/nixos#<target>
 ```
+
+（没有 jj 也可以直接 `git clone`，仓库对纯 git 是兼容的。）
+
+asahi 还需要 `/boot/vendorfw/firmware.cpio` 存在（由 Asahi 安装器写入），
+以及一份本机生成的 `hosts/asahi/hardware-configuration.nix`。
 
 ## 清理磁盘
 
 ```bash
 nix store gc
 ```
+
+两台 NixOS 机器都已开 `nix.gc.automatic` 和 `nix.optimise.automatic`（都是每周，
+asahi 保留 30 天、oci 保留 14 天），正常不需要手动跑。
+
+## 已知的坑
+
+**新文件必须先让 git 看见。** flake 求值读的是 git 索引，而 jj 只管自己的工作副本快照，
+所以新增的 `.nix` 文件在 `jj commit` 之前对 nix 是不可见的：
+
+```
+error: Path 'hosts/asahi/power.nix' in the repository "/etc/nixos" is not tracked by Git.
+```
+
+`git add <文件>` 或直接 `jj commit` 都能解决。
 
 ## 迁移历史
 
