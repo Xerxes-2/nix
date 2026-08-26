@@ -65,6 +65,24 @@ in
     powerOnBoot = false;
   };
 
+  # No night light here, on purpose. Apple's DCP display controller exposes only
+  # the CTM color matrix and no GAMMA_LUT, while niri implements
+  # zwlr_gamma_control_v1 through GAMMA_LUT only, so the whole class of tools -
+  # DMS night mode, wlsunset, gammastep - reports success and changes nothing:
+  #
+  #   $ wlsunset -l -37.8 -L 144.9 -t 2000
+  #   gamma control of output eDP-1 (44) failed
+  #
+  # Installing one of them does not help; the fix has to come from niri (CTM
+  # support) or from the kernel. Emulating it from userspace means alpha
+  # blending a warm layer-shell surface over the screen, which cannot express a
+  # per-channel multiply: cutting blue by 25% costs 25% opacity, which lifts
+  # black into brown. Not worth it - keep DMS night mode switched off instead.
+  #
+  #   niri CTM request:  https://github.com/niri-wm/niri/issues/3672 (closed)
+  #   Asahi kernel side: https://github.com/AsahiLinux/linux/issues/91
+  #   DMS software mode: https://github.com/AvengeMedia/DankMaterialShell/issues/2061
+
   # geoclue 2.8 moved IP geolocation into a new [ip] section with a pluggable
   # `method`, and the NixOS module still only generates the pre-2.8 sections.
   # A source without `enable` defaults to on, so geoclue enables the IP source,
