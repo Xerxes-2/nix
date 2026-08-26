@@ -23,7 +23,17 @@
     kernelParams = [
       "appledrm.show_notch=1"
     ];
+
+    # Run x86_64 Linux binaries through qemu-user. This is the general-purpose
+    # escape hatch (one-off binaries, building x86 packages); the FEX + muvm
+    # container in containers.nix is the fast path for anything that needs
+    # real throughput, like games.
+    binfmt.emulatedSystems = [ "x86_64-linux" ];
   };
+
+  # Loader for binaries that were not built by Nix and expect an FHS-style
+  # dynamic linker (npm/pip/cargo downloads, vendored SDK toolchains).
+  programs.nix-ld.enable = true;
 
   # The panel is 3024x1964, which makes the default 8x16 console font unreadable
   # - relevant exactly when it hurts, i.e. when the graphical session is broken
