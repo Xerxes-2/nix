@@ -51,7 +51,12 @@
       nixosConfigurations.asahi = nixpkgs-unstable.lib.nixosSystem {
         inherit system;
         specialArgs = { inherit inputs; };
-        modules = [ ./hosts/asahi/configuration.nix ];
+        modules = [
+          home-manager.nixosModules.home-manager
+          ./modules/unfree.nix
+          ./hosts/asahi/configuration.nix
+          ./hosts/asahi/home.nix
+        ];
       };
 
       # MacBook（Apple Silicon，Determinate Nix）：standalone home-manager 入口。
