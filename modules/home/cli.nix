@@ -4,15 +4,23 @@
 {
   home.packages = with pkgs; [
     bat
+    btop
     claude-code
     codex
+    curl
     difftastic
+    eza
+    fastfetch
     fd
-    go
     gh
+    git
+    go
     herdr
+    htop
     jjui
     jujutsu
+    lnav
+    nano
     nixd
     nixfmt
     nix-index
@@ -22,16 +30,26 @@
     pnpm
     powershell
     procs
+    ripgrep
+    rsync
     sd
+    sqlite
     steel
     steelix
     tldr
+    tokei
     tombi
+    tree
+    unar
+    unzip
     uv
     viddy
+    vim
     vscode-json-languageserver
     wakatime-cli
+    wget
     yazi
     zellij
+    zip
   ];
 }

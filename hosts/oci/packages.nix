@@ -24,36 +24,18 @@
     options = "--delete-older-than 14d";
   };
 
+  # 只留服务器/btrfs 专用与必须系统级的包；
+  # 通用 CLI 工具都在 modules/home/cli.nix（跨机器共享）。
   environment.systemPackages = with pkgs; [
-    git
-    vim
-    curl
-    htop
-    btrfs-progs
-    # 从 Ubuntu apt 手动安装集迁移而来
     bottom # btm
-    btop
+    btrfs-progs
     bubblewrap
     chromium
     compsize
     duperemove
-    eza
-    fastfetch
     fio
-    gh
-    kitty.terminfo
-    lnav
-    nano
+    kitty.terminfo # SSH 会话按 /etc/terminfo 查找，须留系统级
     restic
-    ripgrep
-    rsync
-    sqlite
-    tokei
-    tree
-    unar
-    unzip
-    wget
-    zip
   ];
 
   # 无头服务器：裁掉 NixOS 手册等文档，减小闭包、加快 rebuild

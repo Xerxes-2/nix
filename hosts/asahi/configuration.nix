@@ -44,7 +44,6 @@
 
   environment.systemPackages = with pkgs; [
     asahi-bless
-    git
   ];
 
   users.mutableUsers = true;

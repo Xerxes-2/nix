@@ -25,9 +25,9 @@
 
 | 场景 | 文件 |
 |---|---|
-| 所有机器都要的 CLI 工具（bat、yazi…） | `modules/home/cli.nix` |
+| 所有机器都要的 CLI 工具（git、htop、bat、yazi…） | `modules/home/cli.nix` |
 | 仅 oci 用户需要的工具（btdu…） | `hosts/oci/home.nix` |
-| oci 系统级工具（htop、rsync…） | `hosts/oci/packages.nix` 的 `environment.systemPackages` |
+| oci 服务器/btrfs 专用或须系统级的包（compsize、kitty.terminfo…） | `hosts/oci/packages.nix` 的 `environment.systemPackages` |
 
 找包名：https://search.nixos.org 或 `nix search nixpkgs xxx`。
 
