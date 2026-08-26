@@ -44,6 +44,27 @@ in
   security.polkit.enable = true;
   xdg.mime.enable = true;
 
+  # System services the DMS widgets talk to directly.
+  # Without UPower the battery widget/popout has no data at all.
+  services.upower.enable = true;
+
+  # DMS ships its own Bluetooth UI on top of BlueZ.
+  hardware.bluetooth = {
+    enable = true;
+    powerOnBoot = false;
+  };
+
+  # Location source for the weather widget and the night-mode schedule.
+  # DMS falls back to IP geolocation when GeoClue has no fix yet.
+  services.geoclue2 = {
+    enable = true;
+    appConfig.dms = {
+      isAllowed = true;
+      isSystem = true;
+      users = [ "1000" ];
+    };
+  };
+
   # Audio stack.
   security.rtkit.enable = true;
   services.pipewire = {
@@ -58,14 +79,12 @@ in
   environment.systemPackages = with pkgs; [
     adwaita-icon-theme
     alacritty
-    brightnessctl
     firefox
-    grim
     nautilus
-    networkmanagerapplet
     pavucontrol
-    playerctl
-    slurp
+    # `pactl` only; DMS uses it to switch Bluetooth audio card profiles.
+    pulseaudio
+    # Optional DMS screenshot editor (`dms ipc call niri screenshot`).
     swappy
     telegram-desktop
     vesktop # Discord client; official Discord has no aarch64-linux build.

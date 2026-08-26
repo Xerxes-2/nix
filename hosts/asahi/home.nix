@@ -29,6 +29,41 @@
           fi
         '';
 
+        # The niri template still points at tools DMS replaces: swaylock, wpctl,
+        # playerctl, brightnessctl and a waybar autostart (waybar isn't even
+        # installed). Route them through DMS so its OSDs and lock screen are
+        # used. One-time migration; the config stays editable afterwards.
+        home.activation.dmsNiriBinds = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+          config="$HOME/.config/niri/config.kdl"
+          marker="$HOME/.local/state/DankMaterialShell/.dms-binds-v1"
+
+          if [ ! -e "$marker" ]; then
+            mkdir -p "$(dirname "$marker")"
+            if [ -f "$config" ]; then
+              sed -i \
+                -e 's|^// This line starts waybar.*|// The bar is part of DMS (dms.service), started with the session.|' \
+                -e '/^spawn-at-startup "waybar"$/d' \
+                -e 's|Lock the Screen: swaylock" { spawn "swaylock"; }|Lock the Screen: DMS" { spawn "dms" "ipc" "call" "lock" "lock"; }|' \
+                -e 's|^    // Example volume keys mappings for PipeWire & WirePlumber.$|    // Volume keys go through DMS so its on-screen display shows up.|' \
+                -e 's|^    // "-l 1.0" limits the volume to 100%.$|    // DMS clamps the volume to its own configured maximum.|' \
+                -e 's|{ spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1+ -l 1.0"; }|{ spawn "dms" "ipc" "call" "audio" "increment" "5"; }|' \
+                -e 's|{ spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1-"; }|{ spawn "dms" "ipc" "call" "audio" "decrement" "5"; }|' \
+                -e 's|{ spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"; }|{ spawn "dms" "ipc" "call" "audio" "mute"; }|' \
+                -e 's|{ spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"; }|{ spawn "dms" "ipc" "call" "audio" "micmute"; }|' \
+                -e 's|^    // Example media keys mapping using playerctl.$|    // Media keys drive the MPRIS player DMS is tracking.|' \
+                -e 's|{ spawn-sh "playerctl play-pause"; }|{ spawn "dms" "ipc" "call" "mpris" "playPause"; }|' \
+                -e 's|{ spawn-sh "playerctl stop"; }|{ spawn "dms" "ipc" "call" "mpris" "stop"; }|' \
+                -e 's|{ spawn-sh "playerctl previous"; }|{ spawn "dms" "ipc" "call" "mpris" "previous"; }|' \
+                -e 's|{ spawn-sh "playerctl next"; }|{ spawn "dms" "ipc" "call" "mpris" "next"; }|' \
+                -e 's|^    // Example brightness key mappings for brightnessctl.$|    // Brightness keys go through DMS (shell OSD + logind backlight).|' \
+                -e 's|{ spawn "brightnessctl" "--class=backlight" "set" "+10%"; }|{ spawn "dms" "ipc" "call" "brightness" "increment" "5" ""; }|' \
+                -e 's|{ spawn "brightnessctl" "--class=backlight" "set" "10%-"; }|{ spawn "dms" "ipc" "call" "brightness" "decrement" "5" ""; }|' \
+                "$config"
+            fi
+            touch "$marker"
+          fi
+        '';
+
         home.activation.dmsNotchLayout = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           settings="$HOME/.config/DankMaterialShell/settings.json"
           marker="$HOME/.local/state/DankMaterialShell/.notch-layout-v3"

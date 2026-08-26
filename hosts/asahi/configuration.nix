@@ -55,6 +55,9 @@
       "networkmanager"
       "video"
       "audio"
+      # DMS reads /dev/input/event* to track the keyboard layout and
+      # Caps/Num lock state.
+      "input"
     ];
   };
 
