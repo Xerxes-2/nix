@@ -28,8 +28,8 @@ whitelist:
 whitelistDockerHosts: true
 basicAuthMode: false
 basicAuthUser:
-  username: admin
-  password: password
+  username: CHANGE_ME
+  password: CHANGE_ME
 enableCorsProxy: false
 cors:
   enabled: true
