@@ -13,6 +13,12 @@
   boot = {
     loader.systemd-boot.enable = true;
     loader.efi.canTouchEfiVariables = false;
+    # The Asahi ESP is 504M and also holds vendorfw (63M), the macOS-side
+    # asahi/ directory (54M) and m1n1 (8M). Every generation with a new kernel
+    # copies a 65M Image plus a 29M initrd in there - the kernel is a full
+    # all-modules NixOS build - so a handful of updates is enough to fill it
+    # and make `nixos-rebuild` fail halfway through. Keep a bounded window.
+    loader.systemd-boot.configurationLimit = 5;
 
     kernelParams = [
       "appledrm.show_notch=1"
@@ -33,11 +39,22 @@
     memoryPercent = 100;
   };
 
-  nix.settings = {
-    experimental-features = [
-      "flakes"
-      "nix-command"
-    ];
+  nix = {
+    settings = {
+      experimental-features = [
+        "flakes"
+        "nix-command"
+      ];
+    };
+
+    # Nothing here reclaims disk on its own, and the ESP budget above depends on
+    # old generations actually going away.
+    gc = {
+      automatic = true;
+      dates = "weekly";
+      options = "--delete-older-than 30d";
+    };
+    optimise.automatic = true;
   };
   networking = {
     hostName = "asahi";
