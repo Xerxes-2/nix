@@ -7,6 +7,7 @@
     ./hardware-configuration.nix
     ./gui.nix
     ./input.nix
+    ./containers.nix
   ];
 
   boot = {

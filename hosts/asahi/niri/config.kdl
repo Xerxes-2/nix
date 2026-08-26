@@ -247,6 +247,12 @@ layout {
 
 // The bar is part of DMS (dms.service), started with the session.
 
+// niri has no built-in X server. xwayland-satellite provides one on demand and
+// niri exports DISPLAY for it, which X11-only clients need - Steam above all.
+xwayland-satellite {
+    path "@xwaylandSatellite@"
+}
+
 // To run a shell command (with variables, pipes, etc.), use spawn-sh-at-startup:
 // spawn-sh-at-startup "qs -c ~/source/qs/MyAwesomeShell"
 

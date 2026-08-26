@@ -1,0 +1,103 @@
+# Fedora Asahi Remix gaming stack in a container.
+#
+# Steam on Apple Silicon needs FEX (x86 emulation), muvm (a 4K-page microVM,
+# because x86 code assumes 4K pages while the machine runs 16K) and the Asahi
+# Mesa/Honeykrisp drivers. Fedora packages all of that; nixpkgs does not, and
+# `programs.steam` cannot even evaluate on aarch64.
+#
+# Build and run:
+#   podman build -t steam:latest hosts/asahi/steam
+#   distrobox create --name steam --image steam:latest --home ~/Distrobox/steam
+#   distrobox enter steam -- steam
+#
+# Adapted from https://gist.github.com/stevesoltys/af4c5c45317c543fa3b88da7d08a7218
+FROM quay.io/fedora/fedora-minimal:42
+WORKDIR /
+
+# COPR plugin plus the Asahi repositories.
+RUN dnf install -y 'dnf5-command(copr)' && \
+    dnf copr enable -y @asahi/mesa && \
+    dnf copr enable -y @asahi/fedora-remix-scripts
+
+# The FEX Mesa overlays live in per-architecture COPR repos that have to be
+# declared by hand, since dnf only pulls the native architecture by default.
+RUN for arch in i386 x86_64; do \
+      repo="/etc/yum.repos.d/group_asahi-mesa-$arch.repo"; \
+      printf '%s\n' \
+        "[copr:copr.fedorainfracloud.org:group_asahi:mesa-$arch]" \
+        "name=Copr repo for mesa owned by @asahi ($arch)" \
+        "baseurl=https://download.copr.fedorainfracloud.org/results/@asahi/mesa/fedora-\$releasever-$arch/" \
+        "type=rpm-md" \
+        "skip_if_unavailable=True" \
+        "gpgcheck=1" \
+        "gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-group_asahi-mesa" \
+        "repo_gpgcheck=0" \
+        "enabled=1" \
+        "enabled_metadata=1" \
+        "priority=5" \
+        "includepkgs=mesa-fex-emu-overlay-$arch*" \
+        > "$repo"; \
+    done
+
+RUN dnf clean all && dnf upgrade --refresh -y
+
+# FEX, muvm and the Asahi graphics stack.
+RUN dnf install -y asahi-platform-metapackage-fex
+
+# Userland distrobox expects to find, plus fonts and audio for Steam.
+# The CJK fonts matter: without them the Steam UI renders tofu for every
+# Chinese/Japanese friend name, game title and chat message.
+RUN dnf install -y \
+      fontconfig \
+      dejavu-sans-fonts \
+      dejavu-serif-fonts \
+      dejavu-sans-mono-fonts \
+      google-noto-sans-cjk-vf-fonts \
+      google-noto-serif-cjk-vf-fonts \
+      google-noto-color-emoji-fonts \
+      sudo \
+      xz \
+      xterm \
+      tar \
+      bash \
+      coreutils \
+      util-linux \
+      procps-ng \
+      findutils \
+      grep \
+      sed \
+      gawk \
+      gzip \
+      which \
+      less \
+      nano \
+      passwd \
+      shadow-utils \
+      systemd \
+      iproute \
+      iputils \
+      curl \
+      wget \
+      mesa-libGLU \
+      ca-certificates \
+      alsa-utils
+
+RUN dnf copr enable -y @asahi/steam && \
+    dnf install -y steam
+
+# Steam asks NetworkManager over the D-Bus system bus whether the machine is
+# online. The muvm guest gets a fresh /run and therefore no system bus, so that
+# check never returns and the client sits on "Waiting for network" forever.
+#
+# Upstream's fix (github.com/defaultdino/asahi-steam-fix) uses `muvm -x` to
+# start a bus before the guest server, but that hook runs too early here: it
+# fails with ENOENT, and when it does run the socket it creates is not the one
+# the payload sees. Bootstrapping the bus from inside the guest command itself
+# works in every case.
+COPY steam-dbus-bootstrap.py /tmp/steam-dbus-bootstrap.py
+RUN python3 /tmp/steam-dbus-bootstrap.py /usr/bin/steam && rm /tmp/steam-dbus-bootstrap.py
+
+RUN dnf clean all && \
+    rm -rf /var/cache/dnf/* /tmp/* /var/tmp/*
+
+CMD ["/bin/bash"]

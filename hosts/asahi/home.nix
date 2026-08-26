@@ -29,6 +29,7 @@ in
         # notch spacer.
         xdg.configFile."niri/config.kdl".source = pkgs.replaceVars ./niri/config.kdl {
           scale = display.scaleText;
+          xwaylandSatellite = lib.getExe pkgs.xwayland-satellite;
         };
 
         # Seed the notch-aware DMS bar layout. This is a one-time migration:
