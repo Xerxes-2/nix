@@ -65,6 +65,22 @@ in
     powerOnBoot = false;
   };
 
+  # geoclue 2.8 moved IP geolocation into a new [ip] section with a pluggable
+  # `method`, and the NixOS module still only generates the pre-2.8 sections.
+  # A source without `enable` defaults to on, so geoclue enables the IP source,
+  # reads a NULL method and immediately kills it again:
+  #
+  #   geoclue[1666]: Unknown IP source method '(null)', disabling source
+  #
+  # conf.d overrides geoclue.conf in alphabetical order, so drop the missing
+  # section in from here instead of fighting the module over geoclue.conf.
+  # `ichnaea` reuses the wifi source's beaconDB endpoint - no new third party.
+  environment.etc."geoclue/conf.d/10-ip-source.conf".text = ''
+    [ip]
+    enable=true
+    method=ichnaea
+  '';
+
   # Location source for the weather widget and the night-mode schedule.
   # DMS falls back to IP geolocation when GeoClue has no fix yet.
   services.geoclue2 = {
