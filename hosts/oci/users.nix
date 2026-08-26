@@ -19,8 +19,6 @@
     openssh.authorizedKeys.keys = [
       # asahi (Apple Silicon MacBook)
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMJYY+oB7f+EX9rSf/KhnBmL0v9fOqMYDIwolS14ap+ xerxes2@asahi->oci 2026-08"
-      # TODO: 旧 RSA-2048 无 passphrase，新钥验证通过后立即删除此行
-      "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDUmTvXl/5tGe4e+alerNLGctJvGjeIWIrq3TeTitCUF2LLuWF49ea7j5XocB5TpBP1KcjXuzUuD0qBBrOdnKC0oX781MbiwdHSf0Cl6R5ZocyJl9Oxsu2Szjxq6Gkhw5u6dumbQHMV9fcPVSHDDuuSBjD3Cc0T1lPOUd3x2FJjebFEVDESXFJPZfKbzAgcBdxccl2T3lqEJ5RX8PeZ4RFK6yB+6G8jaqq8I4IoZU0P0toI568eRm3exGg8MtafY0kWk/FAuCRgmw+dQb2GjwPwP7cHprupbZNRkZaS/v5YJGudMXsa7nTGqQXyt5wAzPpTbvkkJbLhvhb35wN3eeFZ oracle"
     ];
     # 哈希由切换向导写入，lustrate 白名单保留 etc/secrets（mutableUsers 下仅首次建用户时生效）
     hashedPasswordFile = config.sops.secrets."ubuntu-hash".path;
