@@ -1,0 +1,13 @@
+#!/bin/sh
+# Run Proton without the Steam Linux Runtime (pressure-vessel) container.
+#
+# pressure-vessel builds its own /usr for the game, which does not include the
+# FEX i386 Mesa overlay. 32-bit OpenGL titles therefore cannot create a GL
+# context inside it: wine reports "couldn't initialize OpenGL" and the game
+# dies. Calling Proton directly keeps the muvm guest's /usr visible, where the
+# overlay is mounted, and 32-bit GLX works.
+set -e
+STEAM_DIR="${STEAM_COMPAT_CLIENT_INSTALL_PATH:-$HOME/.local/share/Steam}"
+PROTON="$STEAM_DIR/steamapps/common/Proton 9.0 (Beta)/proton"
+[ -x "$PROTON" ] || { echo "proton9-nosrt: $PROTON not found" >&2; exit 1; }
+exec "$PROTON" "$@"

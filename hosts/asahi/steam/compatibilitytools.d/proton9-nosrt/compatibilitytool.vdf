@@ -1,0 +1,13 @@
+"compatibilitytools"
+{
+  "compat_tools"
+  {
+    "proton9-nosrt"
+    {
+      "install_path" "."
+      "display_name" "Proton 9.0 (no Steam Runtime)"
+      "from_oslist" "windows"
+      "to_oslist" "linux"
+    }
+  }
+}
