@@ -5,6 +5,14 @@ let
   dmsSettings = (pkgs.formats.json { }).generate "settings.json" (
     import ./dms/settings.nix { inherit display; }
   );
+
+  # DMS 的 matugen 模板只生成 dank-theme.toml（随壁纸/主题切换重写），
+  # 从不接管 alacritty.toml。所以静态配置交给 home-manager 声明式管理，
+  # 动态配色留给 DMS 在运行时写，两者互不覆盖。
+  # 窗口装饰不在这里关：niri 的 prefer-no-csd 已全局生效。
+  alacrittyConfig = (pkgs.formats.toml { }).generate "alacritty.toml" {
+    general.import = [ "~/.config/alacritty/dank-theme.toml" ];
+  };
 in
 {
   home-manager = {
@@ -31,6 +39,8 @@ in
           scale = display.scaleText;
           xwaylandSatellite = lib.getExe pkgs.xwayland-satellite;
         };
+
+        xdg.configFile."alacritty/alacritty.toml".source = alacrittyConfig;
 
         # Seed the notch-aware DMS bar layout. This is a one-time migration:
         # DMS owns settings.json at runtime, so later UI changes stay.
