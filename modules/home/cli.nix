@@ -9,6 +9,7 @@
     difftastic
     fd
     go
+    gh
     herdr
     jjui
     jujutsu

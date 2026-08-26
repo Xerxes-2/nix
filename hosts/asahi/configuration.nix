@@ -6,6 +6,7 @@
     # and uncomment this line.
     ./hardware-configuration.nix
     ./gui.nix
+    ./input.nix
   ];
 
   boot = {

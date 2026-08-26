@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ inputs, pkgs, ... }:
 {
   # Wayland compositor + desktop shell.
   programs.niri.enable = true;
@@ -11,6 +11,7 @@
       enable = true;
       compositor.name = "niri";
       configHome = "/home/xerxes2";
+      configFiles = [ ./dms/settings.json ];
     };
   };
 
@@ -44,8 +45,11 @@
     playerctl
     slurp
     swappy
+    telegram-desktop
+    vesktop # Discord client; official Discord has no aarch64-linux build.
     wl-clipboard
     xdg-utils
+    inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];
 
   fonts.packages = with pkgs; [
