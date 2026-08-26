@@ -1,5 +1,5 @@
-# Laptop power behaviour: memory pressure handling and battery wear limit.
-
+# Laptop power behaviour: memory pressure handling, battery wear limit and the
+# physical keys.
 { ... }:
 {
   # zswap instead of zram.
@@ -58,4 +58,19 @@
   services.udev.extraRules = ''
     SUBSYSTEM=="power_supply", KERNEL=="macsmc-battery", ATTR{charge_control_start_threshold}="70", ATTR{charge_control_end_threshold}="80"
   '';
+
+  services.logind.settings.Login = {
+    # On this keyboard the power key *is* the Touch ID key, immediately right of
+    # Delete, so a mistyped Delete must not power the machine off. A deliberate
+    # long press still does (systemd defaults that to "ignore").
+    HandlePowerKey = "ignore";
+    HandlePowerKeyLongPress = "poweroff";
+
+    HandleLidSwitch = "suspend";
+    HandleLidSwitchExternalPower = "suspend";
+    # Locking on suspend is not a logind setting (contrary to what several
+    # configs on GitHub claim - `LockScreenOnSuspend=` does not exist in
+    # logind.conf). DMS does it itself: enable "loginctl lock integration" and
+    # "lock before suspend" in its settings.
+  };
 }
