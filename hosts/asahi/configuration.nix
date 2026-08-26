@@ -25,6 +25,11 @@
     ];
   };
 
+  # The panel is 3024x1964, which makes the default 8x16 console font unreadable
+  # - relevant exactly when it hurts, i.e. when the graphical session is broken
+  # and a VT is all that is left.
+  console.font = "${pkgs.terminus_font}/share/consolefonts/ter-v32n.psf.gz";
+
   hardware.asahi = {
     enable = true;
     setupAsahiSound = true;
