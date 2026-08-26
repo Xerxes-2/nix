@@ -9,6 +9,7 @@
     ./gui.nix
     ./input.nix
     ./containers.nix
+    ./power.nix
   ];
 
   boot = {
@@ -50,10 +51,7 @@
   # 没有这行时系统跑在 UTC，DMS 的时钟、日程和夜间模式的日出日落都会错位。
   time.timeZone = "Australia/Melbourne";
 
-  zramSwap = {
-    enable = true;
-    memoryPercent = 100;
-  };
+  # Swap and memory pressure handling live in power.nix (zswap, not zram).
 
   nix = {
     settings = {
