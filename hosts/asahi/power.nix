@@ -46,6 +46,50 @@
     "vm.page-cluster" = 0;
   };
 
+  # The other half of running out of 16G: kill one application before the
+  # desktop grinds to a halt, which is roughly what macOS does with jetsam.
+  #
+  # NixOS enables systemd-oomd by default but leaves all three of
+  # enableRootSlice / enableSystemSlice / enableUserSlices off, so the daemon
+  # runs while monitoring nothing whatsoever - `oomctl` lists no cgroups at all.
+  #
+  # `systemd.oomd.enableUserSlices = true` is the obvious fix and the wrong one
+  # here. It arms user.slice, whose only child is user-1000.slice, so "kill the
+  # worst descendant" means killing the whole session; and since that monitored
+  # ancestor is owned by root while the candidates below it are owned by UID
+  # 1000, systemd-oomd deliberately ignores every ManagedOOMPreference=
+  # exemption set inside the session (systemd.resource-control(5)).
+  #
+  # Monitoring app.slice inside the user manager instead gives per-application
+  # granularity: the candidates are the individual app cgroups (the browser and
+  # Telegram run as run-p*.scope, terminals as app-niri-alacritty-*.scope), the
+  # compositor cannot be touched because niri.service lives in session.slice,
+  # and exemptions are honoured because monitor and candidates share a UID.
+  #
+  # 50% is Fedora's desktop value. The metric is the fraction of a 10s window in
+  # which *every* task in the cgroup was stalled, sustained for 30s, so this
+  # only fires when the session is already unusable. Raise it towards the 80%
+  # the NixOS module uses if anything ever gets killed that should not have been.
+  systemd.user.units."app.slice" = {
+    overrideStrategy = "asDropin";
+    text = ''
+      [Slice]
+      ManagedOOMMemoryPressure=kill
+      ManagedOOMMemoryPressureLimit=50%
+    '';
+  };
+
+  # DMS is session infrastructure that merely happens to sit in app.slice - the
+  # bar, notifications, launcher and lock screen all die with it. At ~400M it
+  # would never win the "most reclaim activity" contest against a browser
+  # anyway, but make that explicit. `avoid` rather than `omit`, so a genuine
+  # runaway in DMS itself can still be dealt with as a last resort.
+  #
+  # This merges into the unit the DMS module already declares; declaring
+  # `systemd.user.units."dms.service"` here instead would be a second, competing
+  # definition of the same unit and fails to evaluate.
+  systemd.user.services.dms.serviceConfig.ManagedOOMPreference = "avoid";
+
   # Stop charging at 80% to slow battery wear. Asahi's macsmc driver emulates
   # the thresholds in the kernel (the SMC has no native support), so the limit
   # keeps being enforced even in s2idle:
@@ -54,7 +98,6 @@
   # sysfs resets to 100 on every boot, and a udev rule is the documented way to
   # make it stick: https://social.treehouse.systems/@AsahiLinux/110560192550506827
   # Start before end - the driver requires start <= end, and both default to 100.
-  # The driver then clamps start up to end - 5, so this lands on 75/80.
   services.udev.extraRules = ''
     SUBSYSTEM=="power_supply", KERNEL=="macsmc-battery", ATTR{charge_control_start_threshold}="70", ATTR{charge_control_end_threshold}="80"
   '';
