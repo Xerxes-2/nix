@@ -1,4 +1,4 @@
-# Laptop power behaviour: memory pressure handling.
+# Laptop power behaviour: memory pressure handling and battery wear limit.
 
 { ... }:
 {
@@ -45,4 +45,17 @@
     # has to be decompressed, and locality on swap-in is poor. Read one page.
     "vm.page-cluster" = 0;
   };
+
+  # Stop charging at 80% to slow battery wear. Asahi's macsmc driver emulates
+  # the thresholds in the kernel (the SMC has no native support), so the limit
+  # keeps being enforced even in s2idle:
+  #   https://github.com/AsahiLinux/linux/commit/6eb70e021ccaae0408e5a746b65848b811c23caa
+  #
+  # sysfs resets to 100 on every boot, and a udev rule is the documented way to
+  # make it stick: https://social.treehouse.systems/@AsahiLinux/110560192550506827
+  # Start before end - the driver requires start <= end, and both default to 100.
+  # The driver then clamps start up to end - 5, so this lands on 75/80.
+  services.udev.extraRules = ''
+    SUBSYSTEM=="power_supply", KERNEL=="macsmc-battery", ATTR{charge_control_start_threshold}="70", ATTR{charge_control_end_threshold}="80"
+  '';
 }
