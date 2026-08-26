@@ -25,6 +25,9 @@
     peripheralFirmwareDirectory = inputs.asahi-firmware;
   };
 
+  # 没有这行时系统跑在 UTC，DMS 的时钟、日程和夜间模式的日出日落都会错位。
+  time.timeZone = "Australia/Melbourne";
+
   zramSwap = {
     enable = true;
     memoryPercent = 100;
