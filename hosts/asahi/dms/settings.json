@@ -1,5 +1,7 @@
 {
   "configVersion": 13,
+  "iconThemeDark": "Adwaita",
+  "iconThemeLight": "Adwaita",
   "barConfigs": [
     {
       "id": "default",
@@ -8,16 +10,14 @@
       "position": 0,
       "screenPreferences": ["all"],
       "showOnLastDisplay": true,
-      "leftWidgets": ["launcherButton", "workspaceSwitcher", "focusedWindow"],
+      "leftWidgets": ["launcherButton", "workspaceSwitcher", "focusedWindow", "music"],
       "centerWidgets": [
-        "music",
         {
           "id": "spacer",
           "size": 220
-        },
-        "clock"
+        }
       ],
-      "rightWidgets": ["systemTray", "clipboard", "cpuUsage", "memUsage", "notificationButton", "battery", "controlCenterButton"],
+      "rightWidgets": ["clock", "systemTray", "clipboard", "cpuUsage", "memUsage", "notificationButton", "battery", "controlCenterButton"],
       "spacing": 4,
       "innerPadding": 4,
       "barInsetPadding": -1,

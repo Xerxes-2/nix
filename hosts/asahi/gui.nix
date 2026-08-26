@@ -4,6 +4,13 @@
   programs.niri.enable = true;
   programs.dms-shell.enable = true;
 
+  # Give Qt applications (including DMS/Quickshell) a real platform theme so
+  # named system-tray icons are resolved through the selected icon theme.
+  qt = {
+    enable = true;
+    platformTheme = "qt5ct";
+  };
+
   # DMS login screen running inside niri.
   services.displayManager = {
     defaultSession = "niri";
@@ -34,6 +41,7 @@
 
   # Useful GUI/session tools.
   environment.systemPackages = with pkgs; [
+    adwaita-icon-theme
     alacritty
     brightnessctl
     firefox
