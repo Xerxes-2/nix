@@ -45,7 +45,20 @@
         "flakes"
         "nix-command"
       ];
+
+      # 16G of unified memory shared with the GPU. Nix defaults to one job per
+      # core (10 here), and a handful of parallel heavy builds is a reliable
+      # way to hit the OOM killer. Cap the number of concurrent derivations
+      # but leave `cores` at 0 (= all cores) so a single big build - the Asahi
+      # kernel, which has no binary cache upstream - still uses the whole CPU.
+      max-jobs = 2;
+      cores = 0;
     };
+
+    # Building should not make the desktop stutter: the daemon and its children
+    # only get CPU and disk when nothing else wants them.
+    daemonCPUSchedPolicy = "idle";
+    daemonIOSchedClass = "idle";
 
     # Nothing here reclaims disk on its own, and the ESP budget above depends on
     # old generations actually going away.
