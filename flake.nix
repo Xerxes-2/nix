@@ -39,6 +39,32 @@
     in
     {
 
+      # `nix run /etc/nixos#update` —— 更新 flake.lock 并自动把"更新了什么"写进提交
+      # 信息。两台 NixOS 机器和 macOS 侧都可能跑，所以两个平台都给。
+      apps = nixpkgs-unstable.lib.genAttrs [ "aarch64-linux" "aarch64-darwin" ] (
+        sys:
+        let
+          pkgs = nixpkgs-unstable.legacyPackages.${sys};
+        in
+        {
+          update = {
+            type = "app";
+            program = pkgs.lib.getExe (
+              pkgs.writeShellApplication {
+                name = "flake-update";
+                # jq 解析 lock，jujutsu 提交，coreutils 保证 macOS 上也是 GNU date
+                runtimeInputs = with pkgs; [
+                  coreutils
+                  jq
+                  jujutsu
+                ];
+                text = builtins.readFile ./scripts/flake-update.sh;
+              }
+            );
+          };
+        }
+      );
+
       nixosConfigurations.oci = nixpkgs-unstable.lib.nixosSystem {
         inherit system;
         modules = [
