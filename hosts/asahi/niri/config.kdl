@@ -608,5 +608,17 @@ binds {
     Mod+Shift+P { power-off-monitors; }
 }
 
-// DMS Include Configs
-include "dms/binds.kdl"
+// DMS-generated fragments. They come last so DMS wins over the defaults
+// above: theme-matched focus ring/border colors, the rounded window corners
+// (geometry-corner-radius + clip-to-geometry) that the focus ring follows,
+// the alt-tab switcher and the wallpaper blur backdrop.
+//
+// dms/outputs.kdl is deliberately NOT included: the output scale lives in
+// hosts/asahi/display.nix because the DMS notch spacer is derived from it.
+include optional=true "dms/colors.kdl"
+include optional=true "dms/layout.kdl"
+include optional=true "dms/alttab.kdl"
+include optional=true "dms/binds.kdl"
+include optional=true "dms/windowrules.kdl"
+include optional=true "dms/wpblur.kdl"
+include optional=true "dms/cursor.kdl"
