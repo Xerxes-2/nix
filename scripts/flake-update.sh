@@ -38,13 +38,62 @@ done
 
 cd "$(jj workspace root)"
 
+# 哪些输入在这台机器上更得动。
+#
+# asahi-firmware 是 `path:/boot/vendorfw`，只有 MacBook 上存在。裸跑
+# `nix flake update` 会在这个输入上直接中止，导致 oci 上一个输入都更不了：
+#
+#     error: path '//boot/vendorfw' does not exist
+#
+# 所以不给参数时不用裸的全量更新，而是显式列出本机可解析的输入。
+skipped=""
+usable=()
+while IFS=$'\t' read -r name localpath; do
+  if [ -n "$localpath" ] && [ ! -e "$localpath" ]; then
+    skipped="${skipped:+$skipped, }$name"
+  else
+    usable+=("$name")
+  fi
+done < <(
+  jq -r '
+    .nodes as $n
+    | $n.root.inputs
+    | to_entries[]
+    | select((.value | type) == "string")
+    | . as $e
+    | ($n[$e.value].locked // {}) as $l
+    | if ($l.type // "") == "path"
+      then "\($e.key)\t\($l.path)"
+      else "\($e.key)\t"
+      end' flake.lock
+)
+
+# 显式点名了某个更不动的输入，就别默默跳过
+for want in ${inputs[@]+"${inputs[@]}"}; do
+  case ", $skipped, " in
+  *", $want, "*)
+    echo "输入 '$want' 在这台机器上无法解析（本地路径不存在），无法更新。" >&2
+    exit 1
+    ;;
+  esac
+done
+
 old=$(mktemp)
 # shellcheck disable=SC2064  # 现在就要展开 $old
 trap "rm -f '$old'" EXIT
 jj file show -r @- flake.lock >"$old" 2>/dev/null || echo '{}' >"$old"
 
 if [ "$commit_only" -eq 0 ] && [ "$dry_run" -eq 0 ]; then
-  nix flake update ${inputs[@]+"${inputs[@]}"}
+  if [ ${#inputs[@]} -gt 0 ]; then
+    nix flake update "${inputs[@]}"
+  elif [ ${#usable[@]} -eq 0 ]; then
+    # 不能落到无参数的 nix flake update，那是全量更新，会再次撞上不存在的路径
+    echo "没有任何输入能在这台机器上解析（跳过：$skipped）。" >&2
+    exit 1
+  else
+    [ -n "$skipped" ] && echo "跳过本机无法解析的输入：$skipped" >&2
+    nix flake update "${usable[@]}"
+  fi
 fi
 
 # 逐节点比对，输出定长 9 字段：状态 名字 旧id 新id 旧时间 新时间 类型 owner repo

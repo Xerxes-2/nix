@@ -129,12 +129,20 @@ asahi 的内核来自 `nixos-apple-silicon`，上游**没有 binary cache**（�
 
 `asahi-firmware` 是一个 `path:/boot/vendorfw` 输入，内容被 flake.lock 按哈希锁住。
 在 macOS 侧跑过 Asahi 安装器的 "Rebuild vendor firmware package" 之后，必须重新锁定
-才会生效：
+才会生效（**只能在 MacBook 上做**，那个路径只有它有）：
 
 ```bash
 nix flake update asahi-firmware
 sudo nixos-rebuild switch --flake /etc/nixos
 ```
+
+正因为它是本机路径，在 oci 上裸跑 `nix flake update` 会直接中止、一个输入都更不了：
+
+```
+error: path '//boot/vendorfw' does not exist
+```
+
+`nix run .#update` 会自动跳过本机不存在的本地 path 输入，所以两台机器上都能直接跑。
 
 ## 回滚
 
