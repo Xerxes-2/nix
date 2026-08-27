@@ -1,6 +1,6 @@
 # Laptop power behaviour: memory pressure handling, battery wear limit and the
 # physical keys.
-{ ... }:
+{ pkgs, ... }:
 {
   # zswap instead of zram.
   #
@@ -101,6 +101,77 @@
   services.udev.extraRules = ''
     SUBSYSTEM=="power_supply", KERNEL=="macsmc-battery", ATTR{charge_control_start_threshold}="70", ATTR{charge_control_end_threshold}="80"
   '';
+
+  # Let the P-clusters reach their top three P-states (3360/3408/3504 MHz).
+  #
+  # The device tree ships those three as `turbo-mode` OPPs, so the cpufreq core
+  # hides them behind the boost knob: `scaling_available_frequencies` stops at
+  # 3264 MHz, which is 93% of the 3504 MHz macOS uses and most of the
+  # single-threaded gap against it.
+  #
+  # They were originally held back because the DVFS controller only grants a
+  # boost state while the *rest* of the cluster sits in deep idle, and Asahi had
+  # no deep idle, so the states were unreachable and were left out of the DT "to
+  # avoid confusing users":
+  #   https://lists.openwall.net/linux-kernel/2022/10/24/116
+  # That blocker is gone here - this kernel has the apple_idle driver with a
+  # "CPU PD" (CPU/cluster powered down) state, which is the condition the
+  # hardware is looking for. Re-check before trusting this after a kernel bump:
+  #   cat /sys/devices/system/cpu/cpu4/cpuidle/state1/name
+  #
+  # That condition also bounds the win: this is a 4E + 3P + 3P machine (policy0,
+  # policy4, policy7), and with a whole P-cluster loaded nothing in it is idle,
+  # so the hardware keeps clamping to 3264. Lightly-threaded work only, never
+  # all-core runs. Nothing is forced either - the frequency is only *requested*,
+  # and the hardware still decides.
+  #
+  # Done from tmpfiles rather than the udev block above because the knob is
+  # /sys/devices/system/cpu/cpufreq/boost, a cpufreq-core attribute rather than a
+  # device: `udevadm info` on that path answers "Unknown device", so ATTR{} has
+  # nothing to match. Writing the global flag also updates the per-policy ones
+  # since 218a06a79d9a ("cpufreq: Support per-policy performance boost").
+  #
+  # Measured here, one core loaded with its cluster siblings in CPU PD:
+  #   schedutil    requested 3264 -> granted 3264
+  #   performance  requested 3504 -> granted 3504
+  # So the hardware does grant boost, and deep idle is not the blocker on this
+  # kernel. schedutil simply never asks, which is an upstream bug rather than
+  # anything Apple-specific: it maps utilisation through capacity_freq_ref, a
+  # deliberately fixed anchor (9942cb22ea45) latched at boot while boost was
+  # still off, so the request saturates at exactly the non-boost ceiling. Fix is
+  # in flight and not in 7.1:
+  #   https://lore.kernel.org/linux-pm/20260806044230.909961-1-sibi.sankar@oss.qualcomm.com/
+  # Keep the flag regardless: it is inert today and starts paying off on its own
+  # once that lands, without needing to remember any of this.
+  systemd.tmpfiles.rules = [
+    "w /sys/devices/system/cpu/cpufreq/boost - - - - 1"
+  ];
+
+  # Until then the only way to reach boost is the performance governor. Running
+  # that full time on a laptop pins the P-cores to 3504 for every burst of work
+  # that lands on them, which is the wrong default on battery - so make it an
+  # explicit, reversible opt-in:
+  #   sudo systemctl start cpu-boost   # benchmark, big build, ...
+  #   sudo systemctl stop  cpu-boost
+  # The E-cluster (policy0) is left alone on purpose: it has no boost states,
+  # and it is where idle and light work should be staying anyway.
+  systemd.services.cpu-boost = {
+    description = "Pin the P-clusters to their maximum P-state, boost included";
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = pkgs.writeShellScript "cpu-boost-on" ''
+        for p in 4 7; do
+          echo performance > /sys/devices/system/cpu/cpufreq/policy$p/scaling_governor
+        done
+      '';
+      ExecStop = pkgs.writeShellScript "cpu-boost-off" ''
+        for p in 4 7; do
+          echo schedutil > /sys/devices/system/cpu/cpufreq/policy$p/scaling_governor
+        done
+      '';
+    };
+  };
 
   services.logind.settings.Login = {
     # On this keyboard the power key *is* the Touch ID key, immediately right of
