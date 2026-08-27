@@ -2,8 +2,8 @@
 {
   imports = [
     inputs.nixos-apple-silicon.nixosModules.default
-    # Run `sudo nixos-generate-config --show-hardware-config | tee hardware-configuration.nix`
-    # and uncomment this line.
+    # Regenerate with
+    # `sudo nixos-generate-config --show-hardware-config | tee hardware-configuration.nix`.
     ./hardware-configuration.nix
     ./filesystems.nix
     ./gui.nix

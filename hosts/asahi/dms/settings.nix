@@ -5,6 +5,12 @@
 # through the DMS UI afterwards stays.
 { display }:
 {
+  # TODO revisit: on every dms-shell bump - a stale version sends this seed
+  # through DMS's migration path instead of being read as-is
+  #   check: grep settingsConfigVersion in Common/SettingsData.qml of the
+  #          installed dms-shell
+  #   then:  bump this to match
+  #   last:  2026-08, dms-shell 1.5.3 - settingsConfigVersion: 13
   configVersion = 13;
   iconThemeDark = "Adwaita";
   iconThemeLight = "Adwaita";

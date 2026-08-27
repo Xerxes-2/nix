@@ -13,6 +13,15 @@ let
 
   # DMS currently has no per-bar background-color setting. Add one while
   # preserving its normal themed background as the fallback.
+  #
+  # TODO revisit: on every dms-shell bump
+  #   check: `--replace-fail` turns an upstream rename into a build error, so a
+  #          failing rebuild is the signal; for the feature itself, look for a
+  #          `backgroundColor` key in the `barConfigs` defaults in
+  #          Common/SettingsData.qml
+  #   then:  drop this overrideAttrs and keep only the settings.json value
+  #   last:  2026-08, dms-shell 1.5.3 - no such setting, DankBarWindow.qml
+  #          still reads Theme.surfaceContainer
   dmsShell = pkgs.dms-shell.overrideAttrs (old: {
     postInstall = (old.postInstall or "") + ''
       substituteInPlace $out/share/quickshell/dms/Modules/DankBar/DankBarWindow.qml \
@@ -82,6 +91,13 @@ in
   #   niri CTM request:  https://github.com/niri-wm/niri/issues/3672 (closed)
   #   Asahi kernel side: https://github.com/AsahiLinux/linux/issues/91
   #   DMS software mode: https://github.com/AvengeMedia/DankMaterialShell/issues/2061
+  #
+  # TODO revisit: when niri (or the DCP driver) grows CTM support
+  #   check: nix run nixpkgs#wlsunset -- -T 3000     # does the screen warm up?
+  #          journalctl --user -u niri | grep -i gamma
+  #   then:  nothing here to undo - just switch DMS night mode back on
+  #   last:  2026-08, niri 26.04 - still GAMMA_LUT-only, DMS night mode still
+  #          goes through zwlr_gamma_control
 
   # geoclue 2.8 moved IP geolocation into a new [ip] section with a pluggable
   # `method`, and the NixOS module still only generates the pre-2.8 sections.
@@ -93,6 +109,13 @@ in
   # conf.d overrides geoclue.conf in alphabetical order, so drop the missing
   # section in from here instead of fighting the module over geoclue.conf.
   # `ichnaea` reuses the wifi source's beaconDB endpoint - no new third party.
+  #
+  # TODO revisit: on nixpkgs bumps that touch geoclue
+  #   check: grep -A2 '^\[ip\]' /etc/geoclue/geoclue.conf
+  #          journalctl -u geoclue | grep 'Unknown IP source'
+  #   then:  delete this conf.d file once the module emits the section itself
+  #   last:  2026-08, geoclue 2.8.1 - module still emits only
+  #          network-nmea/3g/cdma/modem-gps/wifi/static-source
   environment.etc."geoclue/conf.d/10-ip-source.conf".text = ''
     [ip]
     enable=true

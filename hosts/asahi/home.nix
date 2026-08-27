@@ -44,6 +44,13 @@ in
 
         # Seed the notch-aware DMS bar layout. This is a one-time migration:
         # DMS owns settings.json at runtime, so later UI changes stay.
+        #
+        # TODO revisit: 改布局或 DMS 换 config 版本时 —— 有 marker 的机器上这段
+        # 是空转的
+        #   check: ls ~/.local/state/DankMaterialShell/.notch-layout-v4
+        #   then:  要重新播种就把 marker 改成 -v5；等所有机器都迁完之后，可以只
+        #          留 else 分支（全新安装用）并删掉 jq 合并那一半
+        #   last:  2026-08，asahi 上已应用
         home.activation.dmsNotchLayout = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           settings="$HOME/.config/DankMaterialShell/settings.json"
           marker="$HOME/.local/state/DankMaterialShell/.notch-layout-v4"

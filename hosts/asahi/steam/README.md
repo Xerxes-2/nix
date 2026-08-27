@@ -47,6 +47,13 @@ Upstream (<https://github.com/defaultdino/asahi-steam-fix>) uses `muvm -x` for
 this. That hook runs too early here - it fails with `ENOENT`, and when it does
 run the socket it creates is not the one the payload sees.
 
+TODO revisit: on muvm / Fedora Asahi updates.
+
+- check: inside the guest, `ls /run/dbus/system_bus_socket`
+- then: drop `steam-dbus-bootstrap.py` once a system bus is already there, or
+  once `muvm -x` runs late enough to be usable
+- last: 2026-08, still needed
+
 ### 2. Tofu everywhere
 
 The client is an x86 binary under FEX, so it reads fonts from the FEX rootfs,
@@ -86,6 +93,15 @@ container and calls Proton directly.
 
 Select it per game under Properties -> Compatibility. DirectX titles do not
 need it - DXVK talks to Vulkan, which works inside pressure-vessel.
+
+TODO revisit: when Proton or the Steam Linux Runtime is updated.
+
+- check: the status of <https://bugs.winehq.org/show_bug.cgi?id=58754>, then run
+  a 32-bit OpenGL title on stock Proton with `PROTON_LOG=1 WINEDEBUG=+wgl,+egl`
+- then: delete `compatibilitytools.d/proton9-nosrt` once a stock Proton gets a
+  GL context inside pressure-vessel
+- last: 2026-08, bug still `UNCONFIRMED`, and the SLR still ships no i386 Mesa
+  overlay for FEX
 
 ## Notes
 

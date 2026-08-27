@@ -35,6 +35,13 @@ rec {
   #   max(max(20, 26 + 0.6 * p) + p + 4, Theme.barHeight - 4 - (8 - p))
   # With Theme.barHeight = 48 that is `36 + p` for the paddings we use, so pick
   # the padding that makes the opaque bar cover the whole notch.
+  #
+  # TODO revisit: on every dms-shell bump - if upstream changes that formula the
+  # bar silently stops covering the notch
+  #   check: `effectiveBarThickness` in Modules/DankBar/DankBarWindow.qml of the
+  #          installed dms-shell (line 563 in 1.5.3)
+  #   then:  update the formula above and the `36 +` below together
+  #   last:  2026-08, dms-shell 1.5.3 - unchanged
   innerPadding = lib.max 4 (toLogical notchHeightPx - 36);
 
   barThickness = 36 + innerPadding;

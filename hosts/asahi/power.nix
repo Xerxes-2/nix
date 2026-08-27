@@ -70,6 +70,15 @@
   # which *every* task in the cgroup was stalled, sustained for 30s, so this
   # only fires when the session is already unusable. Raise it towards the 80%
   # the NixOS module uses if anything ever gets killed that should not have been.
+  #
+  # TODO revisit: after systemd or nixpkgs bumps - this drop-in is the only
+  # thing keeping systemd-oomd useful, and it fails silently if the unit paths
+  # move
+  #   check: oomctl        # the user app.slice must be listed under
+  #                        # "Monitored memory pressure cgroups"
+  #   then:  if the NixOS module ever monitors app.slice itself, delete this
+  #   last:  2026-08, nixpkgs oomd module still leaves enableRootSlice /
+  #          enableSystemSlice / enableUserSlices all off
   systemd.user.units."app.slice" = {
     overrideStrategy = "asDropin";
     text = ''
@@ -90,16 +99,33 @@
   # definition of the same unit and fails to evaluate.
   systemd.user.services.dms.serviceConfig.ManagedOOMPreference = "avoid";
 
-  # Stop charging at 80% to slow battery wear. Asahi's macsmc driver emulates
-  # the thresholds in the kernel (the SMC has no native support), so the limit
-  # keeps being enforced even in s2idle:
-  #   https://github.com/AsahiLinux/linux/commit/6eb70e021ccaae0408e5a746b65848b811c23caa
+  # Stop charging at 80% to slow battery wear.
+  #
+  # The threshold is enforced by the SMC, not by the kernel, which is why it
+  # survives s2idle. macsmc-power only forwards it, and on modern firmware
+  # (`has_chwa`) `charge_control_end_threshold` is a flag in disguise: the
+  # driver writes `CHWA = (value <= 95)` and the firmware applies its own fixed
+  # 80% cap, so the attribute always reads back exactly 80 and any value below
+  # 95 means the same thing. Older firmware (`has_chls`) takes a real number.
+  #
+  # `charge_control_start_threshold` is deliberately not set: the driver accepts
+  # writes and discards them ("not configurable independently"), the value is
+  # always end - 5, so this machine reads 75 no matter what is written. See
+  # macsmc_battery_set_property() in drivers/power/supply/macsmc-power.c of the
+  # Asahi tree.
   #
   # sysfs resets to 100 on every boot, and a udev rule is the documented way to
   # make it stick: https://social.treehouse.systems/@AsahiLinux/110560192550506827
-  # Start before end - the driver requires start <= end, and both default to 100.
+  #
+  # TODO revisit: after kernel bumps - the thresholds are Asahi-only, the
+  # macsmc-power that went upstream in 7.1 exposes charge_behaviour and no
+  # thresholds at all, so this rule would go silently dead on a mainline driver
+  #   check: cat /sys/class/power_supply/macsmc-battery/charge_control_end_threshold
+  #          # 80 = in effect, 100 = no limit, ENOENT = driver dropped it
+  #   then:  fall back to charge_behaviour, or drop the rule if it is a no-op
+  #   last:  2026-08, 7.1.10 - reads 80/75 as described above
   services.udev.extraRules = ''
-    SUBSYSTEM=="power_supply", KERNEL=="macsmc-battery", ATTR{charge_control_start_threshold}="70", ATTR{charge_control_end_threshold}="80"
+    SUBSYSTEM=="power_supply", KERNEL=="macsmc-battery", ATTR{charge_control_end_threshold}="80"
   '';
 
   # Let the P-clusters reach their top three P-states (3360/3408/3504 MHz).
@@ -143,6 +169,13 @@
   #   https://lore.kernel.org/linux-pm/20260806044230.909961-1-sibi.sankar@oss.qualcomm.com/
   # Keep the flag regardless: it is inert today and starts paying off on its own
   # once that lands, without needing to remember any of this.
+  #
+  # TODO revisit: after every kernel bump
+  #   check: taskset -c 4 timeout 5 bash -c 'while :; do :; done' &
+  #          cat /sys/devices/system/cpu/cpufreq/policy4/scaling_cur_freq
+  #          # 3264000 = schedutil still capped, 3504000 = the fix landed
+  #   then:  delete the cpu-boost unit below, the tmpfiles flag is enough
+  #   last:  2026-08, 7.1.10 - still 3264000, fix series still only on linux-pm
   systemd.tmpfiles.rules = [
     "w /sys/devices/system/cpu/cpufreq/boost - - - - 1"
   ];

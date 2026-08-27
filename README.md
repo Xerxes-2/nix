@@ -186,6 +186,19 @@ error: Path 'hosts/asahi/power.nix' in the repository "/etc/nixos" is not tracke
 
 `git add <文件>` 或直接 `jj commit` 都能解决。
 
+## 复查清单（TODO）
+
+所有绕开上游 bug 的补丁、以及跟着上游版本会失效的假设，都在原地留了统一格式的
+`TODO revisit:` 注释——写清楚**什么时候回来看、怎么验证、验证过了怎么改**，以及上次
+检查的时间和结论。列出来：
+
+```bash
+rg -n --glob '!flake.lock' 'TODO revisit' /etc/nixos
+```
+
+升级 `nixpkgs` / 内核 / dms-shell 之后按这份清单走一遍，能删的就删掉，删不掉的把
+`last:` 那行的日期和结论更新掉。
+
 ## 迁移历史
 
 从 Ubuntu 26.04 经 NIXOS_LUSTRATE 原地迁移、三个 rootless 容器迁为原生服务的记录，
