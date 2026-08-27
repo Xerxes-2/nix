@@ -105,8 +105,21 @@ nix store diff-closures /run/current-system <上面那个路径>
 
 ```bash
 cd /etc/nixos
-nix flake update          # 更新锁文件（nixpkgs 到最新 unstable）
+nix run .#update                      # 更新全部输入，并自动提交
+nix run .#update -- nixpkgs-unstable  # 只更新指定输入
+nix run .#update -- --dry-run         # 只看会生成什么提交信息
 sudo nixos-rebuild switch --flake /etc/nixos
+```
+
+不要直接用 `nix flake update`：它一次动好几个输入，落成一个没有描述的
+flake.lock 改动，事后看不出带进来什么。上面那个包装会把每个输入的 rev、
+日期变化和 GitHub compare 链接写进提交信息。（已经手动改过 lock 的话，
+`nix run .#update -- --commit-only` 可以补一个描述。）
+
+更新后先求值再切，能提前抳掉选项重命名类的破坏：
+
+```bash
+nix eval --raw .#nixosConfigurations.asahi.config.system.build.toplevel.drvPath
 ```
 
 asahi 的内核来自 `nixos-apple-silicon`，上游**没有 binary cache**（见其
