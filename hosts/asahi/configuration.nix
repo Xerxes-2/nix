@@ -10,6 +10,7 @@
     ./input.nix
     ./containers.nix
     ./power.nix
+    ./network.nix
   ];
 
   boot = {
