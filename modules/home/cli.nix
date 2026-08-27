@@ -2,6 +2,15 @@
 # 各 host 的 home.nix 导入此模块，平台特有工具在各自 host 里追加。
 { pkgs, ... }:
 {
+  # 登录 shell。两台 NixOS 机器上真正把 fish 设为登录 shell 的是各自的
+  # `programs.fish.enable` + `users.users.<u>.shell`（系统模块才会写 /etc/shells
+  # 和 vendor 补全）；macOS 没有 nix-darwin 接管，装完还得把
+  # `~/.nix-profile/bin/fish` 加进 /etc/shells 再 `chsh -s` 一次。
+  #
+  # 这里开的是 HM 模块，管 ~/.config/fish/config.fish，让 HM 装的包和
+  # home.sessionVariables 在 fish 里也生效。
+  programs.fish.enable = true;
+
   home.packages = with pkgs; [
     bat
     btop

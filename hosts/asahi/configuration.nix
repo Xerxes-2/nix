@@ -37,6 +37,11 @@
   # dynamic linker (npm/pip/cargo downloads, vendored SDK toolchains).
   programs.nix-ld.enable = true;
 
+  # Login shell. The system module is what makes this usable as one: it puts
+  # fish in /etc/shells and wires up the vendor completions and the
+  # /etc/fish/* environment shims. Same as on oci.
+  programs.fish.enable = true;
+
   # The panel is 3024x1964, which makes the default 8x16 console font unreadable
   # - relevant exactly when it hurts, i.e. when the graphical session is broken
   # and a VT is all that is left.
@@ -98,6 +103,7 @@
 
   users.users.xerxes2 = {
     isNormalUser = true;
+    shell = pkgs.fish;
     extraGroups = [
       "wheel"
       "networkmanager"
