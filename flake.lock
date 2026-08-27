@@ -3,7 +3,7 @@
     "asahi-firmware": {
       "flake": false,
       "locked": {
-        "lastModified": 1787698274,
+        "lastModified": 1787831294,
         "narHash": "sha256-M9C+tAHCVcUDwNcA+BizzHHrxxxTAG2chD5Lp1hDbYo=",
         "path": "/boot/vendorfw",
         "type": "path"
@@ -35,11 +35,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1787778830,
-        "narHash": "sha256-GnLPpDT727E6VpDlALP8JeP1BbSQ17H0HiEEYq6Ql4w=",
+        "lastModified": 1787797243,
+        "narHash": "sha256-8+Q7NOB7RPajRjA4pbCDLzqH+MTjnG9x6LUPLfL2joA=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "6b449e35980e1b75dd17da2d6d9b66e757194f1c",
+        "rev": "99c9ec63390f1d8c14d95d9e8b17cc29cfbd4e11",
         "type": "github"
       },
       "original": {
