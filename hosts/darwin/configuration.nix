@@ -207,10 +207,14 @@
     };
 
     trackpad = {
-      Clicking = true;
+      Clicking = false; # 轻按即点击：关
       TrackpadThreeFingerDrag = true;
     };
   };
+
+  # 关掉开盖即开机（%01 = 仅禁止开盖启动；接电源仍会开机，
+  # 若两者都禁止改成 "%00"）
+  system.nvram.variables."BootPreference" = "%01";
 
   # Touch ID for sudo
   security.pam.services.sudo_local.touchIdAuth = true;
