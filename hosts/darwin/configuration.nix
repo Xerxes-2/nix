@@ -106,7 +106,7 @@
     #   claude-code, codex, iina, inkscape, keka, localsend,
     #   wireshark, zerotier-one
     casks = [
-      "brewforge/extras/lyricsx-mxiris"
+      "brewforge/extras/mxiris-lyricsx" # 曾名 lyricsx-mxiris
       "italomandara/cxpatcher/cxpatcher"
       "badabing2005/pixelflasher/pixelflasher"
 
@@ -162,7 +162,7 @@
 
       # --- network ---
       "cloudflare-warp"
-      "tailscale"
+      "tailscale-app" # 曾名 tailscale（cask；同名 formula 是 CLI）
 
       # --- runtimes (linux-only in nixpkgs) ---
       "nwjs"
