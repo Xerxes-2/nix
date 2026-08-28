@@ -51,8 +51,9 @@
     };
   };
 
-  # 与现状一致：ssh 仅密钥登录，sudo 免密（密码仅串口救援登录用）
-  security.sudo.wheelNeedsPassword = false;
+  # ssh 仅密钥登录；sudo 需要密码，作为“拿到 ssh key ≠ 拿到 root”的第二道关。
+  # 密码来自 sops 里的 ubuntu-hash，改密码走 sops + rebuild（见上 mutableUsers 注释）。
+  security.sudo.wheelNeedsPassword = true;
 
   programs.fish.enable = true;
   programs.nix-ld.enable = true; # 兼容家目录里非 nix 编译的二进制
