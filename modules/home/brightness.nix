@@ -33,14 +33,14 @@ let
       {
         name = "eDP-1";
         path = "/sys/class/backlight/apple-panel-bl";
-        # wluma also factors in how bright the *contents* of the screen are, so
-        # a dark terminal gets more backlight than a white page at the same
-        # ambient level. That needs frame capture: niri offers
-        # wlr-screencopy-unstable-v1, and the frames are reduced to a luma
-        # value on the GPU through Vulkan, which is Honeykrisp here
-        # (asahi_icd.aarch64.json). Drop this to "none" for ALS-only operation
-        # if capture ever breaks after a niri or Mesa bump.
-        capturer = "wayland";
+        # "wayland" would additionally weight the *contents* of the screen
+        # (frame capture via wlr-screencopy, reduced to a luma value through
+        # Vulkan/Honeykrisp), so a dark terminal gets more backlight than a
+        # white page. In practice that made the backlight visibly shift on
+        # every window/page change, which was more distracting than helpful -
+        # hence ALS-only. Set back to "wayland" to re-enable content-aware
+        # adjustment.
+        capturer = "none";
       }
     ];
 
