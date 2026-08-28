@@ -7,6 +7,44 @@
 let
   display = import ./display.nix { inherit lib; };
 
+  # Hardware video decoding through AVD (see avd.nix) reaches the decoder over
+  # the V4L2 Stateless / Request API, which needs both /dev/video* and
+  # /dev/media*. Firefox's RDD sandbox only ever whitelists M2M /dev/video*
+  # nodes plus a read-only /dev - see AddV4l2Dependencies in
+  # SandboxBrokerPolicyFactory, added for the stateful v4l2m2m decoders on
+  # boards like the Raspberry Pi, which need no media controller. There is no
+  # /dev/media* rule and no pref to add one, so the sandbox is all-or-nothing
+  # for our path; without this the RDD process silently falls back to software
+  # decoding.
+  #
+  # This is a real tradeoff: RDD parses untrusted media bitstreams and is
+  # exactly the process you want sandboxed. Scoped to Zen rather than set in
+  # environment.sessionVariables so it does not apply to every process on the
+  # system (`firefox` below still gets the full sandbox, and software decode).
+  #
+  # TODO revisit: drop this once Firefox's RDD sandbox learns about
+  #   /dev/media*, which would make the Request API usable with the sandbox on.
+  #
+  # The flake's own `env` option would do this, but it lives in its home-manager
+  # module and hangs the var off the *unwrapped* derivation (gappsWrapperArgs
+  # only exists there); `default` is already wrapFirefox'd, so overriding it is
+  # a no-op. Enabling that module to get one variable would also hand it this
+  # profile, so wrap the finished package instead. The desktop entries are
+  # `Exec=zen-beta` without a path, so PATH resolution reaches this wrapper too.
+  zen-browser =
+    let
+      zen = inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.default;
+    in
+    pkgs.symlinkJoin {
+      name = "zen-beta-rdd-unsandboxed";
+      paths = [ zen ];
+      nativeBuildInputs = [ pkgs.makeWrapper ];
+      postBuild = ''
+        wrapProgram $out/bin/zen-beta --set MOZ_DISABLE_RDD_SANDBOX 1
+      '';
+      inherit (zen) meta;
+    };
+
   dmsSettings = (pkgs.formats.json { }).generate "settings.json" (
     import ./dms/settings.nix { inherit display; }
   );
@@ -158,7 +196,7 @@ in
     vesktop # Discord client; official Discord has no aarch64-linux build.
     wl-clipboard
     xdg-utils
-    inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.default
+    zen-browser
   ];
 
   fonts.packages = with pkgs; [
