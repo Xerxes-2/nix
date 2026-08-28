@@ -68,7 +68,61 @@ let
       platforms = pkgs.lib.platforms.linux;
     };
   });
+
+  # AVD is a stateless decoder, so it speaks the V4L2 Stateless API. Desktop
+  # software speaks VA-API and essentially nothing else - V4L2 Stateless never
+  # got adopted outside embedded, so mpv/Firefox/ffmpeg cannot drive AVD
+  # directly. This is megi's VA-API -> V4L2 Stateless translation layer (the
+  # revival of Bootlin's abandoned one), in the fork the Asahi folks use.
+  libva-v4l2-request = pkgs.stdenv.mkDerivation {
+    pname = "libva-v4l2-request";
+    version = "1.2-unstable-2026-07-16";
+
+    src = pkgs.fetchFromGitHub {
+      owner = "sofus13";
+      repo = "libva-v4l2_request";
+      rev = "cfe6c2ab1b5346d1e973625d01b79fcb648fcf5e";
+      hash = "sha256-qN/IEte/kFd2Zi9DSPTYSehCkE3MenV9a8n0LBXuICQ=";
+    };
+
+    nativeBuildInputs = with pkgs; [
+      meson
+      ninja
+      pkg-config
+    ];
+    buildInputs = with pkgs; [
+      libva
+      libdrm
+    ];
+
+    # Upstream defaults driverdir to libva's own pkg-config value, which is an
+    # absolute path into libva's store output and thus unwritable. Install into
+    # our own $out/lib/dri instead - hardware.graphics.extraPackages merges that
+    # into /run/opengl-driver/lib/dri, which is the first entry in the driverdir
+    # list nixpkgs' libva is built with.
+    mesonFlags = [ "-Ddriverdir=${placeholder "out"}/lib/dri" ];
+
+    meta = {
+      description = "VA-API backend for V4L2 stateless decoders, used here to reach AVD";
+      homepage = "https://github.com/sofus13/libva-v4l2_request";
+      license = pkgs.lib.licenses.gpl3Only;
+      platforms = pkgs.lib.platforms.linux;
+    };
+  };
 in
 {
   hardware.firmware = [ avd-fw ];
+
+  hardware.graphics.extraPackages = [ libva-v4l2-request ];
+
+  # libva picks its driver from the DRM driver name of the render node, which
+  # here is "asahi" - there is no asahi_drv_video.so and never will be, so
+  # without this every VA-API client silently falls back to software. Nothing
+  # else on this machine ships a VA-API driver, so pinning it globally costs
+  # nothing. (It does leak into the muvm/FEX guest, where the name resolves to
+  # nothing and VA-API init fails - harmless, games use Vulkan, not VA-API.)
+  environment.sessionVariables.LIBVA_DRIVER_NAME = "v4l2_request";
+
+  # vainfo, for checking the above actually took.
+  environment.systemPackages = [ pkgs.libva-utils ];
 }
