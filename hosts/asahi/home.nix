@@ -26,7 +26,10 @@ in
     users.xerxes2 =
       { lib, pkgs, ... }:
       {
-        imports = [ ../../modules/home/cli.nix ];
+        imports = [
+          ../../modules/home/cli.nix
+          ../../modules/home/brightness.nix
+        ];
 
         programs.home-manager.enable = true;
 
