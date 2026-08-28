@@ -135,6 +135,7 @@
       # --- cloud / sync ---
       "binance"
       "google-drive"
+      "bitwarden"
 
       # --- code / dev (desktop apps, separate from their CLI counterparts) ---
       "claude" # Claude desktop (claude-code CLI is in nixpkgs)
