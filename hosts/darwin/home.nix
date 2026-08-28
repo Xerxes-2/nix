@@ -82,10 +82,6 @@
               name = "done";
               src = done.src;
             }
-            {
-              name = "tide";
-              src = tide.src;
-            }
           ];
 
           shellAliases = {
