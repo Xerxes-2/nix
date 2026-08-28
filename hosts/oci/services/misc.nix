@@ -27,22 +27,41 @@
     SystemMaxUse=500M
   '';
 
-  # /home 时间线快照（容器数据全部 bind mount 在此）：误删/误改的兜底。
-  # 保留策略克制：bees 的去重开销随快照数增长，快照也会钉住已删数据。
-  # 首次启用前需手动：btrfs subvolume create /home/.snapshots
+  # 时间线快照：误删/误改的兜底（异地备份是 restic，见 restic.nix）。
+  #
+  # 原先只快照 /home，注释理由是「容器数据全部 bind mount 在此」——那是 rootless
+  # 容器时代的事实。三个服务迁成原生 NixOS 模块之后状态改由 systemd 管在
+  # /var/lib（vaultwarden / private/wakapi / SillyTavern / ntfy-sh），于是每小时
+  # 的快照全花在了几乎没东西的 /home 上，真正需要兜底的库一个都没盖住。
+  # 2026-08 拆出 @varlib 并把快照补上；/home 仍留着，dufs-data 在那儿。
+  #
+  # 保留策略克制：bees 的去重开销随快照数增长，快照也会钉住已删数据。两个 config
+  # 用同一套限额，快照总数翻倍——数据量小，这点开销换对称和好记是划算的。
+  #
+  # 每个被快照的子卷都要有各自的 .snapshots 子卷，首次启用前手动建
+  # （scripts/oci-btrfs-relayout.sh 的 phase 里已经代劳）：
+  #   btrfs subvolume create /home/.snapshots
+  #   btrfs subvolume create /var/lib/.snapshots
   services.snapper = {
     snapshotInterval = "hourly";
     cleanupInterval = "1d";
-    configs.home = {
-      SUBVOLUME = "/home";
-      TIMELINE_CREATE = true;
-      TIMELINE_CLEANUP = true;
-      TIMELINE_LIMIT_HOURLY = 6;
-      TIMELINE_LIMIT_DAILY = 7;
-      TIMELINE_LIMIT_WEEKLY = 0;
-      TIMELINE_LIMIT_MONTHLY = 0;
-      TIMELINE_LIMIT_YEARLY = 0;
-    };
+    configs =
+      let
+        timeline = subvolume: {
+          SUBVOLUME = subvolume;
+          TIMELINE_CREATE = true;
+          TIMELINE_CLEANUP = true;
+          TIMELINE_LIMIT_HOURLY = 6;
+          TIMELINE_LIMIT_DAILY = 7;
+          TIMELINE_LIMIT_WEEKLY = 0;
+          TIMELINE_LIMIT_MONTHLY = 0;
+          TIMELINE_LIMIT_YEARLY = 0;
+        };
+      in
+      {
+        home = timeline "/home";
+        varlib = timeline "/var/lib";
+      };
   };
 
   # 每月 scrub 检测静默数据损坏

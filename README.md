@@ -51,8 +51,46 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 ├── modules/
 │   ├── home/cli.nix        # 跨机器共享的 CLI 工具集
 │   └── unfree.nix          # unfree 包白名单
+├── scripts/
+│   ├── flake-update.sh     # 更新 flake.lock 并把改了什么写进提交信息
+│   └── oci-btrfs-relayout.sh  # 一次性：从 @ 拆出 @nix / @varlib（见下节）
 └── secrets/oci.yaml        # sops 加密的秘密
 ```
+
+## btrfs 子卷布局
+
+**oci**（`/dev/sda1`，全部 `noatime,compress-force=zstd:3,discard=async`）：
+
+| 子卷 | 挂载点 | 快照 | 备注 |
+|---|---|---|---|
+| `@` | `/` | — | 可从 flake 重建，不值得快照 |
+| `@nix` | `/nix` | — | store，全盘最大且完全可复现 |
+| `@varlib` | `/var/lib` | snapper `varlib` | vaultwarden / wakapi / SillyTavern / ntfy 的状态 |
+| `@home` | `/home` | snapper `home` | dufs-data |
+| `@log` | `/var/log` | — | journald 限 500M |
+| `@cache` | `/var/cache` | — | |
+| `@tmp` | `/var/tmp` | — | `/tmp` 是 tmpfs，不在盘上 |
+
+快照保留：每小时一张，留 6 小时 + 7 天。克制是因为 bees 去重开销随快照数增长，
+且快照会钉住已删数据。异地备份是另一层（restic → OCI Object Storage）。
+
+**asahi**：`@` / `@home` / `@nix`，`compress-force=zstd:1`（等级选型的实测数据写在
+`hosts/asahi/filesystems.nix` 的注释里）。无快照。
+
+改布局要搬数据，不是改个 `.nix` 就完事。oci 那次的脚本留在
+`scripts/oci-btrfs-relayout.sh`，分 6 个 phase、每步前确认，可以当模板改：
+
+```bash
+sudo /etc/nixos/scripts/oci-btrfs-relayout.sh    # phase 1-4：体检 → 建子卷 → 构建新一代 → 停机拷贝
+sudo reboot
+sudo /etc/nixos/scripts/oci-btrfs-relayout.sh --verify    # 检查挂载点和服务
+# 观察几天
+sudo /etc/nixos/scripts/oci-btrfs-relayout.sh --cleanup   # 删掉 @ 里的老副本
+```
+
+关键性质：`--cleanup` 之前老数据一直留在 `@/nix` 和 `@/var/lib`，新一代启不起来就
+在 GRUB 里选上一代（它的 stage-1 不挂 `@nix`/`@varlib`，会照常用老副本）。反过来，
+`--cleanup` 之后迁移前的 generation 就永久启不起来了。
 
 ## 加一个包
 
@@ -273,6 +311,13 @@ Zen 和 Firefox 都配好了。它是 unfree 且不可再分发的，所以在 `
 
 **新文件必须先让 jj 快照到，否则 nix 看不见**（报 `Path '...' is not tracked by
 Git`）。跑一条 `jj st` 即可，原理见 `AGENTS.md`。
+
+**btrfs 的压缩挂载选项是整个文件系统的属性，不是子卷的。** 同一个设备上所有挂载
+点的 `compress-force=` 必须写成一样，否则实际生效的是最后挂上的那份。两台机器都用
+`btrfsOpts` / 共享列表来保证这一点。
+
+**改了挂载选项要重启才生效。** `nixos-rebuild switch` 不会重挂已挂载的文件系统；
+压缩也只对之后写入的数据生效。
 
 ## 复查清单（TODO）
 
