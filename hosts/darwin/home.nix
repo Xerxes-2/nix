@@ -175,11 +175,17 @@
         programs.ssh = {
           enable = true;
           enableDefaultConfig = false;
+          # 具体 Host 别名/IP 属于敏感信息，不进公开仓库，
+          # 放本地未托管的 ~/.ssh/config.local（自行备份）。
+          includes = [ "~/.ssh/config.local" ];
           settings = {
             "*" = {
               AddKeysToAgent = "yes";
               IdentityFile = "~/.ssh/id_ed25519";
               UseKeychain = "yes";
+              ServerAliveInterval = 30;
+              ServerAliveCountMax = 3;
+              TCPKeepAlive = "yes";
             };
           };
         };
