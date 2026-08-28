@@ -16,6 +16,10 @@
 
         programs.home-manager.enable = true;
 
+        # HM 的 fish 模块默认开 man.generateCaches（给 fish 生成基于 man 页的补全），
+        # 但新版 HM 在 darwin 上 man.package 默认 null（用系统 man），cache 无效且告警。
+        programs.man.generateCaches = false;
+
         home = {
           username = "xerxes2";
           homeDirectory = "/Users/xerxes2";
