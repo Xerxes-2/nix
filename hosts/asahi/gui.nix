@@ -180,6 +180,12 @@ in
   hardware.bluetooth = {
     enable = true;
     powerOnBoot = false;
+
+    # Battery levels reach BlueZ through the Battery Provider D-Bus API, which
+    # is gated behind the experimental flag - both the generic BAS/GATT provider
+    # and the Apple vendor extension AirPods use. Without this every device
+    # simply reports no battery at all and the DMS popout has nothing to show.
+    settings.General.Experimental = true;
   };
 
   # Night light needs a patched niri (the `niri` package in the let block above).
