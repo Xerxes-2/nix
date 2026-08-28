@@ -9,5 +9,7 @@
     pkg:
     builtins.elem (lib.getName pkg) [
       "claude-code"
+      # Widevine CDM，asahi 的浏览器放 DRM 流媒体要用；见 hosts/asahi/gui.nix。
+      "widevine-cdm"
     ];
 }

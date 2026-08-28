@@ -37,7 +37,7 @@ jj 的工作副本打架。
 │   ├── filesystems.nix     # btrfs 压缩/挂载选项，叠加在上面那份之上
 │   ├── power.nix           # zswap / 电池上限 / 电源键 / systemd-oomd
 │   ├── dualboot.nix        # 切回 macOS、同步 macOS 的蓝牙/Wi-Fi 凭据
-│   ├── gui.nix             # niri + DMS + 音频 + 字体
+│   ├── gui.nix             # niri + DMS + 音频 + 字体 + Widevine
 │   ├── display.nix         # 内屏刘海几何的唯一真相，缩放改这里
 │   ├── input.nix           # fcitx5 双拼
 │   ├── containers.nix      # podman / distrobox
@@ -206,6 +206,11 @@ nix store gc
 asahi 保留 30 天、oci 保留 14 天），正常不需要手动跑。
 
 ## 已知的坑
+
+**DRM 流媒体（Netflix / Spotify Web / Prime）需要 Widevine，Mozilla 不给 aarch64 出。**
+`gui.nix` 里按 Asahi 上游的办法自己装了一份（从 ChromeOS 镜像里取 arm64 CDM 再改 ELF），
+Zen 和 Firefox 都配好了。它是 unfree 且不可再分发的，所以在 `modules/unfree.nix` 里单独放行。
+播不出来时先看 `about:support` 里 `media.gmp-widevinecdm` 有没有加载。
 
 **USB-C 外接显示器（DP alt mode）在稳定内核上没有**，要自己编 `fairydust` 分支。HDMI
 可用。

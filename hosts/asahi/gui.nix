@@ -36,14 +36,76 @@ let
       zen = inputs.zen-browser.packages.${pkgs.stdenv.hostPlatform.system}.default;
     in
     pkgs.symlinkJoin {
-      name = "zen-beta-rdd-unsandboxed";
+      name = "zen-beta-wrapped";
       paths = [ zen ];
       nativeBuildInputs = [ pkgs.makeWrapper ];
       postBuild = ''
         wrapProgram $out/bin/zen-beta --set MOZ_DISABLE_RDD_SANDBOX 1
+
+        # `defaults/pref/*.js` is read before the profile, so these stay
+        # overridable in about:config. lndir gives us a real directory here, but
+        # its name carries the version - fail the build rather than silently
+        # shipping a browser without the prefs if that ever changes.
+        shopt -s failglob
+        for prefs in "$out"/lib/zen-bin-*/defaults/pref; do
+          install -Dm444 ${widevinePrefs} "$prefs/gmpwidevine.js"
+        done
       '';
       inherit (zen) meta;
     };
+
+  # Widevine, i.e. whether DRM streaming (Netflix, Spotify Web, Prime) plays at
+  # all rather than showing an error page.
+  #
+  # Mozilla ships no aarch64 build of the CDM, so Firefox's usual "fetch it from
+  # our CDN on first use" path has nothing to download. nixpkgs' `widevine-cdm`
+  # does what the Asahi installer does instead: pull the arm64 CDM out of a
+  # ChromeOS lacros image and rewrite its ELF for vanilla glibc
+  # (AsahiLinux/widevine-installer, widevine_fixup.py). Proprietary and
+  # non-redistributable, hence the entry in modules/unfree.nix.
+  #
+  # Two halves, and neither works without the other:
+  #
+  # 1. The library. Gecko picks up MOZ_GMP_PATH directly, without going through
+  #    the addon manager (GeckoMediaPluginServiceParent::LoadFromEnvironment),
+  #    and wants a directory laid out as `gmp-<id>/<version>`. The version is
+  #    just a label; upstream uses the literal string "system-installed" and the
+  #    prefs below have to agree with it. The nixpkgs package only installs the
+  #    Chromium layout (share/google/chrome/...), so assemble that directory.
+  #
+  # 2. The prefs. `media.gmp-widevinecdm.visible` is false on platforms Mozilla
+  #    has no CDM for, and EME rejects the key system before anything ever looks
+  #    at the library - which is why the DRM checkbox is missing from the
+  #    settings UI on arm64 to begin with. Copied from conf/gmpwidevine.js of
+  #    the installer.
+  #
+  # TODO revisit: on nixpkgs bumps
+  #   check: whether wrapFirefox learned about Widevine (`grep -i widevine` in
+  #          pkgs/applications/networking/browsers/firefox/wrapper.nix), and
+  #          whether widevine-cdm still installs only the Chromium layout
+  #   then:  drop the prefs/GMP dir in favour of whatever option it exposes
+  #   last:  2026-08, widevine-cdm 120.0.6098.0-7a3928f - wrapper.nix has no
+  #          mention of gmp/widevine at all
+  widevineGmp = pkgs.runCommand "widevine-gmp" { } ''
+    cdm=${pkgs.widevine-cdm}/share/google/chrome/WidevineCdm
+    install -Dm444 "$cdm/manifest.json" $out/gmp-widevinecdm/system-installed/manifest.json
+    install -Dm555 "$cdm/_platform_specific/linux_arm64/libwidevinecdm.so" \
+      $out/gmp-widevinecdm/system-installed/libwidevinecdm.so
+  '';
+
+  widevinePrefs = pkgs.writeText "gmpwidevine.js" ''
+    pref("media.gmp-widevinecdm.version", "system-installed");
+    pref("media.gmp-widevinecdm.visible", true);
+    pref("media.gmp-widevinecdm.enabled", true);
+    pref("media.gmp-widevinecdm.autoupdate", false);
+    pref("media.eme.enabled", true);
+    pref("media.eme.encrypted-media-encryption-scheme.enabled", true);
+  '';
+
+  # Same prefs for the fallback browser. wrapFirefox appends these to its
+  # autoconfig `mozilla.cfg`, which only touches defaults - the sandbox and
+  # everything else this package does stay untouched.
+  firefox = pkgs.firefox.override { extraPrefsFiles = [ widevinePrefs ]; };
 
   dmsSettings = (pkgs.formats.json { }).generate "settings.json" (
     import ./dms/settings.nix { inherit display; }
@@ -199,6 +261,12 @@ in
     };
   };
 
+  # Where Gecko finds the CDM assembled in the let block above. Set globally
+  # rather than per-wrapper because both browsers need it and, unlike
+  # MOZ_DISABLE_RDD_SANDBOX, it takes nothing away from anything else that
+  # happens to inherit it.
+  environment.sessionVariables.MOZ_GMP_PATH = "${widevineGmp}/gmp-widevinecdm/system-installed";
+
   # Audio stack.
   security.rtkit.enable = true;
   services.pipewire = {
@@ -213,6 +281,8 @@ in
   environment.systemPackages = with pkgs; [
     adwaita-icon-theme
     alacritty
+    # `with pkgs` binds looser than `let`, so both of the browsers below are the
+    # overridden ones from the let block, not the bare nixpkgs attributes.
     firefox
     nautilus
     pavucontrol
