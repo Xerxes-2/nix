@@ -12,6 +12,7 @@
     ./avd.nix
     ./power.nix
     ./network.nix
+    ./dualboot.nix
   ];
 
   boot = {
@@ -96,10 +97,6 @@
     networkmanager.wifi.backend = "iwd";
     wireless.iwd.enable = true;
   };
-
-  environment.systemPackages = with pkgs; [
-    asahi-bless
-  ];
 
   users.mutableUsers = true;
 

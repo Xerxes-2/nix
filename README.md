@@ -36,6 +36,7 @@ jj 的工作副本打架。
 │   ├── hardware-configuration.nix   # 生成的，别手改
 │   ├── filesystems.nix     # btrfs 压缩/挂载选项，叠加在上面那份之上
 │   ├── power.nix           # zswap / 电池上限 / 电源键 / systemd-oomd
+│   ├── dualboot.nix        # 切回 macOS、同步 macOS 的蓝牙/Wi-Fi 凭据
 │   ├── gui.nix             # niri + DMS + 音频 + 字体
 │   ├── display.nix         # 内屏刘海几何的唯一真相，缩放改这里
 │   ├── input.nix           # fcitx5 双拼
@@ -61,6 +62,7 @@ jj 的工作副本打架。
 | oci 服务器/btrfs 专用或须系统级的包 | `hosts/oci/packages.nix` |
 | asahi 的 GUI 程序、字体 | `hosts/asahi/gui.nix` |
 | asahi 的输入法相关 | `hosts/asahi/input.nix` |
+| asahi 上与 macOS 双启动相关的工具 | `hosts/asahi/dualboot.nix` |
 
 找包名：https://search.nixos.org 或 `nix search nixpkgs xxx`。
 
@@ -144,6 +146,34 @@ error: path '//boot/vendorfw' does not exist
 
 `nix run .#update` 会自动跳过本机不存在的本地 path 输入，所以两台机器上都能直接跑。
 
+## 切回 macOS
+
+启动盘的选择存在 NOR flash 的 NVRAM 里，`asahi-bless` 负责改它。包了一层：
+
+```bash
+boot-macos          # 只把「下次启动」设成 macOS，然后自己重启；终端里跑会问一句
+boot-macos --now    # 设好之后立刻重启
+```
+
+**默认启动盘始终是 NixOS**（用的是 `--next`），所以从 macOS 重启回来自动就是 Linux，
+不需要事后再 bless 一次。启动器里的 `Boot macOS Next` 是同一个脚本——它只打标记、不会
+立刻重启，免得模糊搜索一回车就把没保存的东西弄丢。
+
+想看/改默认启动盘用 `sudo asahi-bless -l`。
+
+## 同步 macOS 的蓝牙配对和 Wi-Fi 密码
+
+macOS 把蓝牙配对密钥和 Wi-Fi 密码也写在同一块 NVRAM 里，可以搬到 Linux 这边，省掉
+每次切系统重新配对耳机、重输密码：
+
+```bash
+sudo asahi-btsync list && sudo asahi-btsync sync      # 蓝牙配对密钥 -> bluez
+sudo asahi-wifisync list && sudo asahi-wifisync sync  # Wi-Fi 密码 -> NetworkManager
+```
+
+刻意没做成开机自动跑：配对不常变，而 `sync` 会改 `/var/lib/bluetooth` 并让 bluetoothd
+重载配置。在 macOS 侧配好新设备之后手动跑一次就够了。
+
 ## 回滚
 
 ```bash
@@ -176,6 +206,12 @@ nix store gc
 asahi 保留 30 天、oci 保留 14 天），正常不需要手动跑。
 
 ## 已知的坑
+
+**USB-C 外接显示器（DP alt mode）在稳定内核上没有**，要自己编 `fairydust` 分支。HDMI
+可用。
+
+**合盖休眠每小时掉 2-3% 电**，是 s2idle 的已知状态（AsahiLinux/linux#262），配置层面
+无解。
 
 **新文件必须先让 jj 快照到。** flake 求值读的是 git 的跟踪状态，刚创建、还没被任何
 jj 指令快照过的新文件对 nix 不可见：
