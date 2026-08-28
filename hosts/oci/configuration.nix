@@ -13,6 +13,7 @@
     ./services/restic.nix
     ./services/cloudflared.nix
     ./services/vaultwarden.nix
+    ./services/ntfy.nix
     ./services/misc.nix
   ];
 }

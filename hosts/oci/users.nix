@@ -50,6 +50,10 @@
       "vaultwarden-env" = { };
       "restic-env" = { };
       "restic-password" = { };
+      # ntfy-env 给服务端（用户/ACL/令牌），ntfy-token 只给发告警的脚本用；
+      # 拆两份是为了让发布方拿不到 admin 的密码哈希。两处的 tk_ 必须一致。
+      "ntfy-env" = { };
+      "ntfy-token" = { };
     };
   };
 

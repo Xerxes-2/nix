@@ -28,7 +28,7 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 ├── hosts/oci/
 │   ├── configuration.nix   # NixOS 入口，imports 下面的模块
 │   ├── boot.nix filesystems.nix network.nix users.nix packages.nix
-│   ├── services/           # wakapi / sillytavern / vaultwarden / restic / cloudflared / misc
+│   ├── services/           # wakapi / sillytavern / vaultwarden / ntfy / restic / cloudflared / misc
 │   ├── home.nix            # ubuntu 用户的 Home Manager（含 dufs）
 │   └── sillytavern.yaml    # SillyTavern 配置（无机密，进 git）
 ├── hosts/asahi/
@@ -220,6 +220,43 @@ nix store gc
 
 两台 NixOS 机器都已开 `nix.gc.automatic` 和 `nix.optimise.automatic`（都是每周，
 asahi 保留 30 天、oci 保留 14 天），正常不需要手动跑。
+
+## 服务出问题时会推送到手机（ntfy）
+
+`hosts/oci/services/ntfy.nix`：oci 上跑 ntfy 服务端，13 个关键单元挂了 `OnFailure=`，
+失败时把 `systemctl status` 的尾巴推到 topic **`oci-alerts`**。
+
+订阅（手机装 ntfy app，或浏览器开 https://ntfy.xerxes2.com）：
+
+| 项 | 值 |
+|---|---|
+| 服务器 | `https://ntfy.xerxes2.com` |
+| topic | `oci-alerts` |
+| 账号 | `admin`，密码在 vaultwarden 里 |
+
+服务器默认 `auth-default-access: deny-all`（公网可达，不能当公共中转），用户 / ACL /
+令牌全部走 sops `ntfy-env` 声明式下发，**不要用 `ntfy user add` 改**——声明式条目每次
+启动都会覆盖回来。发告警的是单独的 `alerts` 账号，对 `oci-alerts` 只有 write-only。
+
+改覆盖范围：编辑 `ntfy.nix` 里的 `monitoredUnits` 列表。新加服务时记得回来加一行。
+
+自测一条（`%n` 只在解析 unit 文件时展开，`systemd-run --property=` 走 D-Bus
+不做 specifier 展开，所以这里必须把实例名写全）：
+
+```bash
+sudo systemd-run --unit=ntfy-selftest \
+  --property=OnFailure=notify-failure@ntfy-selftest.service.service \
+  /run/current-system/sw/bin/false
+```
+
+只想验证推送链路（令牌、网络）而不管 OnFailure 接线，可以直接跑通知器：
+
+```bash
+sudo systemctl start 'notify-failure@sshd.service.service'
+```
+
+**两个覆盖不到的盲区**：ntfy 自己挂了、整台机器失联——这两种情况没人能发出告警。
+要补需要外部的 dead-man's switch（healthchecks.io 之类，或另一台机器上的 gatus）。
 
 ## 已知的坑
 
