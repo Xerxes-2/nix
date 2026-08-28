@@ -100,15 +100,11 @@
             jl = "jj log";
           };
 
-          shellInit = ''
-            # carapace completions
-            carapace _carapace 2>/dev/null
-          '';
-
           interactiveShellInit = ''
             starship init fish | source
             zoxide init fish | source
             fzf --fish | source
+            carapace _carapace fish 2>/dev/null | source
           '';
         };
 
