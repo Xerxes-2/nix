@@ -18,11 +18,8 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 ## 仓库位置与版本控制
 
 两台 NixOS 机器上都在 **`/etc/nixos`**，macOS 侧在 **`~/.config/nix`**，
-都用 **jj**（colocated，git 作为后端）。
-
-`git log` / `git branch` 能看，但**不要用 git 改**：colocated 仓库的 git HEAD 永远是
-detached 的，那是 jj 的正常状态而非故障，用 `git checkout` / `git reset` 去"修"会和
-jj 的工作副本打架。
+都用 **jj**（colocated，git 作为后端）。所有改动走 jj、git 只读——
+具体约定（为什么 git HEAD 是 detached、提交信息格式、新文件快照）见 `AGENTS.md`。
 
 ## 结构
 
@@ -237,22 +234,13 @@ Zen 和 Firefox 都配好了。它是 unfree 且不可再分发的，所以在 `
 **合盖休眠每小时掉 2-3% 电**，是 s2idle 的已知状态（AsahiLinux/linux#262），配置层面
 无解。
 
-**新文件必须先让 jj 快照到。** flake 求值读的是 git 的跟踪状态，刚创建、还没被任何
-jj 指令快照过的新文件对 nix 不可见：
-
-```
-error: Path 'hosts/asahi/power.nix' in the repository "/etc/nixos" is not tracked by Git.
-```
-
-跑任意一条 jj 指令（`jj st` 就行）即可：自动快照会把新文件以 intent-to-add 登记进
-git 索引，nix 便认作已跟踪并读到工作树的完整内容，不需要先 `jj commit`。
-（`git add <文件>` 也能解决。）
+**新文件必须先让 jj 快照到，否则 nix 看不见**（报 `Path '...' is not tracked by
+Git`）。跑一条 `jj st` 即可，原理见 `AGENTS.md`。
 
 ## 复查清单（TODO）
 
 所有绕开上游 bug 的补丁、以及跟着上游版本会失效的假设，都在原地留了统一格式的
-`TODO revisit:` 注释——写清楚**什么时候回来看、怎么验证、验证过了怎么改**，以及上次
-检查的时间和结论。列出来：
+`TODO revisit:` 注释（格式约定见 `AGENTS.md`）。列出来：
 
 ```bash
 rg -n --glob '!flake.lock' 'TODO revisit' /etc/nixos

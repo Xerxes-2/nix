@@ -1,6 +1,6 @@
 # AGENTS.md
 
-多机 NixOS / Home Manager 配置仓库，三个部署目标（`oci` / `asahi` / `xerxes2`），全部由 `flake.nix` 声明式管理。
+多机 NixOS / Home Manager 配置仓库，三个部署目标（`oci` / `asahi` / `XueMacBook-Pro`），全部由 `flake.nix` 声明式管理。
 
 **操作手册是 `README.md`**：加包、应用变更、升级、回滚、换机还原的步骤都在里面，动手前先读对应小节。本文件只记不读就一定会踩的约定，其余一律查 README，不在此重复。
 
@@ -12,7 +12,6 @@
 - git HEAD 永远是 detached——那是 colocated 的正常状态，不是故障，别去"修"。
 - 提交：`jj new <parent> -m "<scope>: <描述>"`；改已有提交用 `jj describe` / `jj squash` / `jj split`。
 - 提交信息带 **scope 前缀**（`asahi:` `oci:` `flake:` `security:` `restic:` `home:` `README:`），主体一句中文说清改了什么、为什么。
-- 另一台机器同步：`jj git fetch` → `jj new main`，不要 `git pull`。
 
 ## 新文件先让 jj 快照到
 
@@ -38,4 +37,4 @@ flake 求值读的是 git 的跟踪状态：**刚创建、还没被 jj 快照过
 #   last:  <YYYY-MM, 上次检查的版本与结论>
 ```
 
-升级 nixpkgs / 内核 / dms-shell 后，按 `rg -n --glob '!flake.lock' 'TODO revisit'` 走一遍：能删的删，删不掉的更新 `last:`。
+升级后的复查流程见 README「复查清单（TODO）」。
