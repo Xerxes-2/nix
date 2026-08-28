@@ -133,15 +133,22 @@ in
   # per-level curve - which is why that request was closed. So the ramp has to
   # be applied in the renderer instead: the patch advertises a 256-entry ramp
   # (one entry per 8-bit framebuffer level, so nothing is lost against a
-  # hardware LUT) and runs it as a shader pass over the composited output, the
-  # same fallback wlroots grew in !5166.
+  # hardware LUT) and looks every channel up in a shader, the same fallback
+  # wlroots grew in !5166.
   #
-  # It is not free. While a ramp is set, the output loses partial damage (the
-  # pass has to see whole frames) and direct scanout, so a fullscreen video at
-  # night gets composited instead of being handed straight to the display. An
-  # identity ramp counts as no ramp, so night mode that is merely scheduled
-  # costs nothing during the day, and the cursor stays on its own plane - which
-  # also means the cursor itself stays untinted.
+  # A ramp is a per-pixel function, so the patch transforms exactly the damage
+  # rectangles and costs proportionally to the damaged area. The first version
+  # instead used niri's blur machinery (`is_framebuffer_effect`), which repaints
+  # the whole element whenever anything below it changes because blur is a
+  # neighborhood operation; that turned every blinking cursor into a full-output
+  # recomposite and measured +0.5 W on this panel. Measurements are in the
+  # commit message of the jj change that added this.
+  #
+  # What is still lost while a ramp is set is direct scanout, so a fullscreen
+  # video at night gets composited instead of being handed straight to the
+  # display. An identity ramp counts as no ramp, so night mode that is merely
+  # scheduled costs nothing during the day, and the cursor stays on its own
+  # plane - which also means the cursor itself stays untinted.
   #
   #   niri CTM request:  https://github.com/niri-wm/niri/issues/3672 (closed)
   #   why not CTM:       https://gitlab.freedesktop.org/wlroots/wlroots/-/issues/1078

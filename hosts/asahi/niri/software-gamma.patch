@@ -1,4 +1,4 @@
-From e7e4fd02b3bef40dc19a8280a65cecf9b787b528 Mon Sep 17 00:00:00 2001
+From 81dd9e4075a7a8e2afe4db4ec0ab449ba2809202 Mon Sep 17 00:00:00 2001
 From: niri patch <niri@local>
 Date: Fri, 28 Aug 2026 15:11:28 +1000
 Subject: [PATCH] render: apply gamma ramps in software when there's no
@@ -15,18 +15,28 @@ fallback wlroots grew in !5166: advertise a 256 entry ramp - one entry per
 8 bit framebuffer level, so nothing is lost compared to a hardware LUT of
 the same depth - and hand it to the renderer instead of the CRTC.
 
-The ramp is applied by a framebuffer effect element that covers the output:
-it captures the composited frame into a texture and draws it back through a
-shader that looks up every channel in the ramp, uploaded as a 256x1 texture
-on unit 1. The element sits below the pointer so the cursor can stay on its
-own plane; promoting it would cost a full-output recomposite on every
-pointer motion, which is a much worse trade than an untinted cursor.
+The ramp is applied by an element on top of the output that copies the
+freshly composited pixels into a texture and draws them back through a
+shader looking every channel up in the ramp, which is uploaded as a 256x1
+texture on unit 1. A ramp is a per-pixel function, so this is done for
+exactly the damage rectangles handed to draw(), and costs proportionally to
+the damaged area. Doing it per rectangle is also what keeps it correct:
+pixels outside the damage still hold the transformed values from an earlier
+frame, and transforming them again would compound. For the same reason all
+the copying happens before anything is drawn back - damage rectangles may
+overlap, and the transform must not see its own output.
 
-Costs, all of them paid only while a client actually has a non-identity ramp
-set: the output cannot use partial damage (a framebuffer effect covering the
-output is fully damaged whenever anything below it changes) and direct
-scanout is disabled. An identity ramp is treated as no ramp at all, which is
-what clients leave behind when night light is scheduled but inactive.
+Note that this deliberately does not use is_framebuffer_effect(): that
+machinery is built for blur, where a changed pixel affects a whole
+neighborhood, so it re-captures and repaints the entire element whenever
+anything below it changes. For a point-wise transform that would turn every
+one pixel of damage into a full output recomposite - measured at +0.5 W on
+a 3024x1964 panel with a 20 Hz clock as the only damage source.
+
+What is still lost while a ramp is set is direct scanout, since the frame
+has to go through the renderer. An identity ramp is treated as no ramp at
+all, which is what clients leave behind when night light is scheduled but
+inactive, so nothing is drawn and nothing is paid for in that case.
 
 Since this needs no DRM at all, it also gives the winit backend working
 gamma control. `debug { force-software-gamma }` takes the software path even
@@ -38,8 +48,8 @@ when the hardware has a LUT, for testing.
  src/render_helpers/mod.rs                 |   1 +
  src/render_helpers/shaders/gamma_lut.frag |  55 +++
  src/render_helpers/shaders/mod.rs         |  15 +
- src/render_helpers/software_gamma.rs      | 466 ++++++++++++++++++++++
- 7 files changed, 611 insertions(+), 12 deletions(-)
+ src/render_helpers/software_gamma.rs      | 449 ++++++++++++++++++++++
+ 7 files changed, 594 insertions(+), 12 deletions(-)
  create mode 100644 src/render_helpers/shaders/gamma_lut.frag
  create mode 100644 src/render_helpers/software_gamma.rs
 
@@ -360,10 +370,10 @@ index 7be9b15..9c677e5 100644
              blur,
 diff --git a/src/render_helpers/software_gamma.rs b/src/render_helpers/software_gamma.rs
 new file mode 100644
-index 0000000..a692dff
+index 0000000..e2848cf
 --- /dev/null
 +++ b/src/render_helpers/software_gamma.rs
-@@ -0,0 +1,466 @@
+@@ -0,0 +1,449 @@
 +//! Software fallback for `zwlr_gamma_control_v1`.
 +//!
 +//! Some display controllers have no `GAMMA_LUT` CRTC property at all (the Apple
@@ -371,16 +381,25 @@ index 0000000..a692dff
 +//! matrix cannot express the 3×1D ramps of the protocol). On those, hardware
 +//! gamma is simply unavailable and every night-light tool fails.
 +//!
-+//! This applies the ramp in the render pipeline instead: the composited output
-+//! is captured into a texture and drawn back through a shader that looks every
-+//! channel up in the ramp. Same idea as the wlroots software gamma fallback.
++//! This applies the ramp in the render pipeline instead: an element on top of
++//! the output copies the freshly composited pixels into a texture and draws
++//! them back through a shader that looks every channel up in the ramp.
 +//!
-+//! The cost is that the whole output has to be recomposited whenever anything on
-+//! it changes (a framebuffer effect covering the output cannot use partial
-+//! damage), and that direct scanout is disabled while a ramp is set. Nothing is
-+//! drawn, and nothing is paid for, when no client set a ramp.
++//! The ramp is a per-pixel function, so this is done for exactly the damaged
++//! rectangles, and costs proportionally to the damaged area. That is also what
++//! keeps it correct: pixels outside the damage still hold the transformed
++//! values from an earlier frame, and transforming them again would compound.
++//! For the same reason the capture is *not* a `is_framebuffer_effect()` one -
++//! that machinery is built for blur, where a changed pixel affects a whole
++//! neighborhood, so it re-captures and repaints the entire element whenever
++//! anything below it changes.
++//!
++//! What is still lost while a ramp is set is direct scanout, since the frame
++//! has to go through the renderer. Nothing is drawn, and nothing is paid for,
++//! when no client set a ramp.
 +
 +use std::cell::RefCell;
++use std::rc::Rc;
 +use std::sync::Arc;
 +
 +use smithay::backend::allocator::Fourcc;
@@ -390,7 +409,7 @@ index 0000000..a692dff
 +};
 +use smithay::backend::renderer::utils::CommitCounter;
 +use smithay::backend::renderer::{
-+    Frame as _, FrameContext, ImportMem as _, Offscreen, Texture as _,
++    ContextId, Frame as _, FrameContext, ImportMem as _, Offscreen, Renderer as _, Texture as _,
 +};
 +use smithay::gpu_span_location;
 +use smithay::utils::user_data::UserDataMap;
@@ -415,6 +434,22 @@ index 0000000..a692dff
 +    serial: u64,
 +}
 +
++/// Textures kept between frames.
++///
++/// Lives in the output state rather than in the element cache that smithay
++/// keeps for framebuffer effects, since we are not one.
++#[derive(Debug, Default)]
++struct Textures {
++    /// Renderer that created the textures below.
++    context: Option<ContextId<GlesTexture>>,
++    /// Copy of the composited output, only valid inside the damage.
++    capture: Option<GlesTexture>,
++    /// The ramp as a `GAMMA_SIZE` × 1 texture.
++    lut: Option<GlesTexture>,
++    /// Serial of the ramp currently in `lut`.
++    lut_serial: u64,
++}
++
 +/// Per-output software gamma state.
 +#[derive(Debug)]
 +pub struct SoftwareGamma {
@@ -422,6 +457,7 @@ index 0000000..a692dff
 +    commit: CommitCounter,
 +    lut: Option<Arc<Lut>>,
 +    next_serial: u64,
++    textures: Rc<RefCell<Textures>>,
 +}
 +
 +#[derive(Debug)]
@@ -430,18 +466,7 @@ index 0000000..a692dff
 +    commit: CommitCounter,
 +    geometry: Rectangle<f64, Logical>,
 +    lut: Arc<Lut>,
-+}
-+
-+#[derive(Debug, Default)]
-+struct Inner {
-+    /// Copy of the framebuffer below the element.
-+    framebuffer: Option<GlesTexture>,
-+    /// The ramp uploaded as a `GAMMA_SIZE` × 1 texture.
-+    lut: Option<GlesTexture>,
-+    /// Serial of the ramp currently in `lut`.
-+    lut_serial: u64,
-+    /// Whether the last capture succeeded.
-+    captured: bool,
++    textures: Rc<RefCell<Textures>>,
 +}
 +
 +impl SoftwareGamma {
@@ -451,6 +476,7 @@ index 0000000..a692dff
 +            commit: CommitCounter::default(),
 +            lut: None,
 +            next_serial: 1,
++            textures: Rc::new(RefCell::new(Textures::default())),
 +        }
 +    }
 +
@@ -481,8 +507,7 @@ index 0000000..a692dff
 +                        // every level onto itself is a no-op on the 8-bit
 +                        // framebuffer. Clients leave such a ramp set whenever
 +                        // night light is scheduled but currently inactive, and
-+                        // rendering it would cost a full-output recomposite on
-+                        // every frame for nothing.
++                        // rendering it would cost redraws for nothing.
 +                        identity &= u32::from(r) == i as u32
 +                            && u32::from(g) == i as u32
 +                            && u32::from(b) == i as u32;
@@ -517,6 +542,11 @@ index 0000000..a692dff
 +        });
 +        self.commit.increment();
 +
++        // Don't hold on to an output-sized texture while nothing is being drawn.
++        if self.lut.is_none() {
++            *self.textures.borrow_mut() = Textures::default();
++        }
++
 +        true
 +    }
 +
@@ -527,6 +557,7 @@ index 0000000..a692dff
 +            commit: self.commit,
 +            geometry: Rectangle::from_size(output_size),
 +            lut,
++            textures: self.textures.clone(),
 +        })
 +    }
 +}
@@ -557,69 +588,90 @@ index 0000000..a692dff
 +    fn geometry(&self, scale: Scale<f64>) -> Rectangle<i32, Physical> {
 +        self.geometry.to_physical_precise_round(scale)
 +    }
-+
-+    fn is_framebuffer_effect(&self) -> bool {
-+        true
-+    }
 +}
 +
 +impl RenderElement<GlesRenderer> for SoftwareGammaElement {
-+    fn capture_framebuffer(
++    fn draw(
 +        &self,
 +        frame: &mut GlesFrame<'_, '_>,
 +        _src: Rectangle<f64, Buffer>,
 +        dst: Rectangle<i32, Physical>,
-+        cache: &UserDataMap,
++        damage: &[Rectangle<i32, Physical>],
++        _opaque_regions: &[Rectangle<i32, Physical>],
++        _cache: Option<&UserDataMap>,
 +    ) -> Result<(), GlesError> {
-+        let _span = tracy_client::span!("SoftwareGammaElement::capture_framebuffer");
-+        let location = gpu_span_location!("SoftwareGammaElement::capture_framebuffer");
-+        frame.with_gpu_span(location, |frame| {
-+            let output_rect = Rectangle::from_size(frame.output_size());
-+            let transform = frame.transformation();
++        let _span = tracy_client::span!("SoftwareGammaElement::draw");
 +
++        // Without the shader we can't transform anything; leave the framebuffer
++        // as it is rather than drawing an untransformed copy over itself.
++        let Some(program) = Shaders::get_from_frame(frame).gamma_lut.clone() else {
++            return Ok(());
++        };
++
++        let output_rect = Rectangle::from_size(frame.output_size());
++        let transform = frame.transformation();
++
++        // The element normally covers the output exactly; clamp in case rounding
++        // makes it a pixel bigger, since glBlitFramebuffer skips out-of-bounds
++        // pixels.
++        let Some(clamped_dst) = dst.intersection(output_rect) else {
++            return Ok(());
++        };
++
++        // `damage` is relative to `dst`. Collect it both in output coordinates,
++        // for the capture, and relative to `clamped_dst`, for the draw.
++        let mut captured = Vec::with_capacity(damage.len());
++        let mut to_draw = Vec::with_capacity(damage.len());
++        for rect in damage {
++            let rect = Rectangle::new(rect.loc + dst.loc, rect.size);
++            let Some(rect) = rect.intersection(clamped_dst) else {
++                continue;
++            };
++            captured.push(transform.transform_rect_in(rect, &output_rect.size));
++            to_draw.push(Rectangle::new(rect.loc - clamped_dst.loc, rect.size));
++        }
++        if to_draw.is_empty() {
++            return Ok(());
++        }
++
++        // Framebuffer coordinates of the whole element, so that the capture
++        // texture maps onto it one texel per pixel.
++        let element_rect = transform.transform_rect_in(clamped_dst, &output_rect.size);
++        let size = element_rect
++            .size
++            .to_logical(1)
++            .to_buffer(1, Transform::Normal);
++
++        let (capture, lut) = {
++            let mut textures = self.textures.borrow_mut();
 +            let mut guard = frame.renderer();
++            let renderer = guard.as_mut();
 +
-+            let inner = cache.get_or_insert::<RefCell<Inner>, _>(|| RefCell::new(Inner::default()));
-+            let mut inner = inner.borrow_mut();
-+            let inner = &mut *inner;
-+
-+            inner.captured = false;
-+
-+            // Clamp to the framebuffer: glBlitFramebuffer skips out-of-bounds
-+            // pixels. The element normally covers the output exactly, this is
-+            // just in case rounding makes it a pixel bigger.
-+            let Some(clamped_dst) = dst.intersection(output_rect) else {
-+                return Ok(());
-+            };
-+
-+            // Framebuffer coordinates of the region we're capturing.
-+            let src_rect = transform.transform_rect_in(clamped_dst, &output_rect.size);
-+            let size = src_rect.size.to_logical(1).to_buffer(1, Transform::Normal);
-+
-+            // Recreate the framebuffer copy if the size changed.
-+            if inner
-+                .framebuffer
-+                .as_ref()
-+                .is_some_and(|fb| fb.size() != size)
-+            {
-+                inner.framebuffer = None;
++            // Textures cannot be shared between renderers.
++            let context = renderer.context_id();
++            if textures.context.as_ref() != Some(&context) {
++                *textures = Textures {
++                    context: Some(context),
++                    ..Textures::default()
++                };
 +            }
-+            let framebuffer = if let Some(fb) = &inner.framebuffer {
-+                fb
-+            } else {
-+                trace!("creating gamma framebuffer texture {} × {}", size.w, size.h);
-+                let renderer = guard.as_mut();
-+                let texture = renderer.create_buffer(Fourcc::Abgr8888, size)?;
-+                inner.framebuffer.insert(texture)
-+            };
-+            let framebuffer_id = framebuffer.tex_id();
 +
-+            // Upload the ramp if it changed.
-+            if inner.lut.is_none() || inner.lut_serial != self.lut.serial {
-+                let renderer = guard.as_mut();
-+                let size = Size::from((GAMMA_SIZE as i32, 1));
++            if textures.capture.as_ref().is_some_and(|t| t.size() != size) {
++                textures.capture = None;
++            }
++            let capture = match &textures.capture {
++                Some(texture) => texture.clone(),
++                None => {
++                    trace!("creating gamma capture texture {} × {}", size.w, size.h);
++                    let texture = renderer.create_buffer(Fourcc::Abgr8888, size)?;
++                    textures.capture.insert(texture).clone()
++                }
++            };
++
++            if textures.lut.is_none() || textures.lut_serial != self.lut.serial {
++                let lut_size = Size::from((GAMMA_SIZE as i32, 1));
 +                let texture =
-+                    renderer.import_memory(&self.lut.data, Fourcc::Abgr8888, size, false)?;
++                    renderer.import_memory(&self.lut.data, Fourcc::Abgr8888, lut_size, false)?;
 +
 +                // import_memory() leaves the default GL_NEAREST_MIPMAP_LINEAR
 +                // min filter, which makes the texture incomplete (we have no
@@ -641,13 +693,21 @@ index 0000000..a692dff
 +                    gl.BindTexture(ffi::TEXTURE_2D, 0);
 +                })?;
 +
-+                inner.lut = Some(texture);
-+                inner.lut_serial = self.lut.serial;
++                textures.lut = Some(texture);
++                textures.lut_serial = self.lut.serial;
 +            }
++            let lut = textures.lut.clone().expect("just inserted");
 +
-+            // We can't use renderer.with_context() as that will reset the GlesFrame binding that we
-+            // want to blit from.
-+            drop(guard);
++            (capture, lut)
++        };
++
++        // Copy the damaged pixels out. All of them, before anything is drawn
++        // back: damage rectangles may overlap, and the transform must not see
++        // its own output.
++        let location = gpu_span_location!("SoftwareGammaElement::capture");
++        frame.with_gpu_span(location, |frame| {
++            let capture_id = capture.tex_id();
++            let origin = element_rect.loc;
 +
 +            frame.with_context(|gl| unsafe {
 +                while gl.GetError() != ffi::NO_ERROR {}
@@ -661,32 +721,37 @@ index 0000000..a692dff
 +                let mut fbo = 0;
 +                gl.GenFramebuffers(1, &mut fbo as *mut _);
 +                gl.BindFramebuffer(ffi::DRAW_FRAMEBUFFER, fbo);
-+
 +                gl.FramebufferTexture2D(
 +                    ffi::DRAW_FRAMEBUFFER,
 +                    ffi::COLOR_ATTACHMENT0,
 +                    ffi::TEXTURE_2D,
-+                    framebuffer_id,
++                    capture_id,
 +                    0,
 +                );
 +
-+                gl.BlitFramebuffer(
-+                    src_rect.loc.x,
-+                    src_rect.loc.y,
-+                    src_rect.loc.x + src_rect.size.w,
-+                    src_rect.loc.y + src_rect.size.h,
-+                    0,
-+                    0,
-+                    size.w,
-+                    size.h,
-+                    ffi::COLOR_BUFFER_BIT,
-+                    ffi::NEAREST,
-+                );
++                // The projection puts framebuffer y in the same direction as
++                // output y, so source and destination rectangles only differ by
++                // the element origin.
++                for rect in &captured {
++                    let (sx, sy) = (rect.loc.x, rect.loc.y);
++                    let (dx, dy) = (sx - origin.x, sy - origin.y);
++                    gl.BlitFramebuffer(
++                        sx,
++                        sy,
++                        sx + rect.size.w,
++                        sy + rect.size.h,
++                        dx,
++                        dy,
++                        dx + rect.size.w,
++                        dy + rect.size.h,
++                        ffi::COLOR_BUFFER_BIT,
++                        ffi::NEAREST,
++                    );
++                }
 +
 +                // Restore state set by GlesFrame that we just modified.
 +                gl.BindFramebuffer(ffi::DRAW_FRAMEBUFFER, current_fbo as u32);
 +                gl.Enable(ffi::SCISSOR_TEST);
-+
 +                gl.DeleteFramebuffers(1, &mut fbo as *mut _);
 +
 +                if gl.GetError() != ffi::NO_ERROR {
@@ -694,67 +759,8 @@ index 0000000..a692dff
 +                } else {
 +                    Ok(())
 +                }
-+            })??;
-+
-+            inner.captured = true;
-+
-+            Ok(())
-+        })
-+    }
-+
-+    fn draw(
-+        &self,
-+        frame: &mut GlesFrame<'_, '_>,
-+        _src: Rectangle<f64, Buffer>,
-+        dst: Rectangle<i32, Physical>,
-+        damage: &[Rectangle<i32, Physical>],
-+        _opaque_regions: &[Rectangle<i32, Physical>],
-+        cache: Option<&UserDataMap>,
-+    ) -> Result<(), GlesError> {
-+        let Some(cache) = cache else {
-+            return Ok(());
-+        };
-+        let Some(inner) = cache.get::<RefCell<Inner>>() else {
-+            return Ok(());
-+        };
-+        let inner = inner.borrow();
-+
-+        if !inner.captured {
-+            return Ok(());
-+        }
-+        let (Some(texture), Some(lut)) = (&inner.framebuffer, &inner.lut) else {
-+            return Ok(());
-+        };
-+
-+        // Without the shader we can't transform anything; leave the framebuffer
-+        // as it is rather than drawing an untransformed copy over itself.
-+        let Some(program) = Shaders::get_from_frame(frame).gamma_lut.clone() else {
-+            return Ok(());
-+        };
-+
-+        // Clamp the same way as in capture_framebuffer().
-+        let output_rect = Rectangle::from_size(frame.output_size());
-+        let Some(clamped_dst) = dst.intersection(output_rect) else {
-+            return Ok(());
-+        };
-+        let clamp_offset = clamped_dst.loc - dst.loc;
-+
-+        let mut damage = damage.to_vec();
-+        if clamped_dst != dst {
-+            let r = Rectangle::new(clamp_offset, clamped_dst.size);
-+            damage.retain_mut(|d| {
-+                if let Some(mut crop) = d.intersection(r) {
-+                    crop.loc -= clamp_offset;
-+                    *d = crop;
-+                    true
-+                } else {
-+                    false
-+                }
-+            });
-+        }
-+        if damage.is_empty() {
-+            return Ok(());
-+        }
++            })?
++        })?;
 +
 +        let size = GAMMA_SIZE as f32;
 +        let uniforms = [
@@ -763,7 +769,7 @@ index 0000000..a692dff
 +        ];
 +
 +        // The shader samples the ramp from texture unit 1; unit 0 is the
-+        // captured framebuffer, bound by render_texture_from_to() below.
++        // capture, bound by render_texture_from_to() below.
 +        let lut_id = lut.tex_id();
 +        frame.with_context(|gl| unsafe {
 +            gl.ActiveTexture(ffi::TEXTURE1);
@@ -771,15 +777,14 @@ index 0000000..a692dff
 +            gl.ActiveTexture(ffi::TEXTURE0);
 +        })?;
 +
-+        let transform = frame.transformation().invert();
 +        let res = frame.render_texture_from_to(
-+            texture,
-+            Rectangle::from_size(texture.size().to_f64()),
++            &capture,
++            Rectangle::from_size(capture.size().to_f64()),
 +            clamped_dst,
-+            &damage,
++            &to_draw,
 +            &[],
-+            // The captured texture has the same transform as the frame.
-+            transform,
++            // The capture has the same transform as the frame.
++            transform.invert(),
 +            1.,
 +            Some(&program),
 +            &uniforms,
@@ -796,18 +801,6 @@ index 0000000..a692dff
 +}
 +
 +impl<'render> RenderElement<TtyRenderer<'render>> for SoftwareGammaElement {
-+    fn capture_framebuffer(
-+        &self,
-+        frame: &mut TtyFrame<'_, '_, '_>,
-+        src: Rectangle<f64, Buffer>,
-+        dst: Rectangle<i32, Physical>,
-+        cache: &UserDataMap,
-+    ) -> Result<(), TtyRendererError<'render>> {
-+        let gles_frame = frame.as_gles_frame();
-+        RenderElement::<GlesRenderer>::capture_framebuffer(&self, gles_frame, src, dst, cache)?;
-+        Ok(())
-+    }
-+
 +    fn draw(
 +        &self,
 +        frame: &mut TtyFrame<'_, '_, '_>,
