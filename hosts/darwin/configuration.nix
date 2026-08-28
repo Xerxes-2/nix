@@ -93,8 +93,6 @@
 
     # ── Brews (formulae not in nixpkgs) ──
     brews = [
-      "pi-coding-agent"
-      "fisher"
       "pkg-config-wrapper"
       "j-x-z/tap/cocoa-way"
       "j-x-z/tap/waypipe-darwin"
