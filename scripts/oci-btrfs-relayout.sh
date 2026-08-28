@@ -73,6 +73,29 @@ umount_top() { mountpoint -q "$TOP" && umount "$TOP" || true; }
 
 subvol_exists() { [[ -d "$TOP/$1" ]] && btrfs subvolume show "$TOP/$1" &>/dev/null; }
 
+# 清空目录但保留目录本身。
+#
+# 不能直接 rm -rf 这个目录：btrfs 整个 fs 共用一个 superblock，各子卷挂载共享
+# dcache，所以 $TOP/@/nix 和 / 上被 /nix 盖住的那个目录是同一个 dentry。内核判 EBUSY
+# 看的是 dentry 而不是路径，所以尽管 mountpoint(1) 说这个路径不是挂载点，rmdir
+# 照样报 Device or resource busy。
+#
+# 而且这目录本来就该留着——没它 /nix 没地方挂。
+empty_dir() {
+  [[ -d $1 ]] || {
+    c_ok "$1 不存在，跳过"
+    return
+  }
+  if [[ -z $(find "$1" -mindepth 1 -maxdepth 1 -print -quit) ]]; then
+    c_ok "$1 已经是空的"
+    return
+  fi
+  c_do "find $1 -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +"
+  find "$1" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+  [[ -z $(find "$1" -mindepth 1 -maxdepth 1 -print -quit) ]] || c_er "$1 没清干净"
+  c_ok "$1 已清空（目录保留，它是挂载点）"
+}
+
 # ---------- phase 1：体检 ----------
 
 phase_preflight() {
@@ -257,16 +280,18 @@ phase_cleanup() {
 
   mount_top
   echo
-  echo "  要删："
+  echo "  要清空的目录（目录本身保留，它们是 /nix 和 /var/lib 的挂载点）："
   du -sh "$TOP/@/nix" "$TOP/@/var/lib" 2>/dev/null | sed 's/^/    /' || true
   echo
   c_wn "删完之后，迁移前的 generation 就启不起来了（它们的 init 找 @/nix，那时是空的）。"
   c_wn "GRUB 里 configurationLimit=4，迁移后再 rebuild 几次它们本来也会被挤掉。"
   confirm "确定删？" || return 0
 
-  run rm -rf "$TOP/@/nix"
-  run rm -rf "$TOP/@/var/lib"
-  c_ok "删完了。空间不会立刻还回来——reflink 共享的 extent 只有在最后一个引用消失后才释放"
+  for dir in "$TOP/@/nix" "$TOP/@/var/lib"; do
+    empty_dir "$dir"
+  done
+  c_ok "删完了。释放量会很小——拷贝是 reflink 的，extent 要等最后一个引用消失才真正释放，"
+  c_ok "而 @nix / @varlib 还拿着它们。真正省下的是以后不再被快照拖着走。"
 
   echo
   df -h / | sed 's/^/    /'
