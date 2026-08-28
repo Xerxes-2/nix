@@ -19,6 +19,8 @@
       "/home/ubuntu/dufs-data"
       "/var/lib/private/wakapi"
       "/var/lib/SillyTavern"
+      # vaultwarden 备的是模块 23:00 生成的 sqlite 安全副本，不是运行中的库
+      "/var/backup/vaultwarden"
       "/home/ubuntu/.config"
       "/etc"
     ];

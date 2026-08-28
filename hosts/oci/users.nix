@@ -45,6 +45,7 @@
       "root-hash".neededForUsers = true;
       "cloudflared-env" = { };
       "wakapi-env" = { };
+      "vaultwarden-env" = { };
       "restic-env" = { };
       "restic-password" = { };
     };

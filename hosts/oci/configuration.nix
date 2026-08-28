@@ -12,6 +12,7 @@
     ./services/sillytavern.nix
     ./services/restic.nix
     ./services/cloudflared.nix
+    ./services/vaultwarden.nix
     ./services/misc.nix
   ];
 }

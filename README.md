@@ -28,7 +28,7 @@ jj 的工作副本打架。
 ├── hosts/oci/
 │   ├── configuration.nix   # NixOS 入口，imports 下面的模块
 │   ├── boot.nix filesystems.nix network.nix users.nix packages.nix
-│   ├── services/           # wakapi / sillytavern / restic / cloudflared / misc
+│   ├── services/           # wakapi / sillytavern / vaultwarden / restic / cloudflared / misc
 │   ├── home.nix            # ubuntu 用户的 Home Manager（含 dufs）
 │   └── sillytavern.yaml    # SillyTavern 配置（无机密，进 git）
 ├── hosts/asahi/
