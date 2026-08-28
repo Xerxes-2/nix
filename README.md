@@ -177,14 +177,16 @@ asahi 保留 30 天、oci 保留 14 天），正常不需要手动跑。
 
 ## 已知的坑
 
-**新文件必须先让 git 看见。** flake 求值读的是 git 索引，而 jj 只管自己的工作副本快照，
-所以新增的 `.nix` 文件在 `jj commit` 之前对 nix 是不可见的：
+**新文件必须先让 jj 快照到。** flake 求值读的是 git 的跟踪状态，刚创建、还没被任何
+jj 指令快照过的新文件对 nix 不可见：
 
 ```
 error: Path 'hosts/asahi/power.nix' in the repository "/etc/nixos" is not tracked by Git.
 ```
 
-`git add <文件>` 或直接 `jj commit` 都能解决。
+跑任意一条 jj 指令（`jj st` 就行）即可：自动快照会把新文件以 intent-to-add 登记进
+git 索引，nix 便认作已跟踪并读到工作树的完整内容，不需要先 `jj commit`。
+（`git add <文件>` 也能解决。）
 
 ## 复查清单（TODO）
 
