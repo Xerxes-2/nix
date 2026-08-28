@@ -40,7 +40,7 @@ jj 的工作副本打架。
 │   ├── display.nix         # 内屏刘海几何的唯一真相，缩放改这里
 │   ├── input.nix           # fcitx5 双拼
 │   ├── containers.nix      # podman / distrobox
-│   ├── niri/config.kdl     # 声明式的 niri 配置
+│   ├── niri/               # config.kdl + 软件夜间模式补丁（见 gui.nix 的注释）
 │   ├── dms/settings.nix    # DMS 首次启动的初始布局
 │   ├── home.nix            # xerxes2 用户的 Home Manager
 │   └── steam/              # Fedora Asahi 游戏栈容器（FEX + muvm），见其 README

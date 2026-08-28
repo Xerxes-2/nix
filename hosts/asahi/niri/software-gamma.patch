@@ -1,0 +1,835 @@
+From e7e4fd02b3bef40dc19a8280a65cecf9b787b528 Mon Sep 17 00:00:00 2001
+From: niri patch <niri@local>
+Date: Fri, 28 Aug 2026 15:11:28 +1000
+Subject: [PATCH] render: apply gamma ramps in software when there's no
+ hardware LUT
+
+The Apple DCP (Apple Silicon, Asahi Linux) exposes only CTM on its CRTC and
+no GAMMA_LUT, and a 3x3 matrix cannot express the three 1D ramps of
+zwlr_gamma_control_v1 (see wlroots#1078). Gamma control on such hardware
+fails for every client, so wlsunset, gammastep, DankMaterialShell's night
+mode and friends silently do nothing.
+
+Fall back to applying the ramp while rendering, like the software gamma
+fallback wlroots grew in !5166: advertise a 256 entry ramp - one entry per
+8 bit framebuffer level, so nothing is lost compared to a hardware LUT of
+the same depth - and hand it to the renderer instead of the CRTC.
+
+The ramp is applied by a framebuffer effect element that covers the output:
+it captures the composited frame into a texture and draws it back through a
+shader that looks up every channel in the ramp, uploaded as a 256x1 texture
+on unit 1. The element sits below the pointer so the cursor can stay on its
+own plane; promoting it would cost a full-output recomposite on every
+pointer motion, which is a much worse trade than an untinted cursor.
+
+Costs, all of them paid only while a client actually has a non-identity ramp
+set: the output cannot use partial damage (a framebuffer effect covering the
+output is fully damaged whenever anything below it changes) and direct
+scanout is disabled. An identity ramp is treated as no ramp at all, which is
+what clients leave behind when night light is scheduled but inactive.
+
+Since this needs no DRM at all, it also gives the winit backend working
+gamma control. `debug { force-software-gamma }` takes the software path even
+when the hardware has a LUT, for testing.
+---
+ niri-config/src/debug.rs                  |   4 +
+ src/handlers/mod.rs                       |  48 ++-
+ src/niri.rs                               |  34 +-
+ src/render_helpers/mod.rs                 |   1 +
+ src/render_helpers/shaders/gamma_lut.frag |  55 +++
+ src/render_helpers/shaders/mod.rs         |  15 +
+ src/render_helpers/software_gamma.rs      | 466 ++++++++++++++++++++++
+ 7 files changed, 611 insertions(+), 12 deletions(-)
+ create mode 100644 src/render_helpers/shaders/gamma_lut.frag
+ create mode 100644 src/render_helpers/software_gamma.rs
+
+diff --git a/niri-config/src/debug.rs b/niri-config/src/debug.rs
+index c0779a4..f9c99b2 100644
+--- a/niri-config/src/debug.rs
++++ b/niri-config/src/debug.rs
+@@ -25,6 +25,7 @@ pub struct Debug {
+     pub honor_xdg_activation_with_invalid_serial: bool,
+     pub deactivate_unfocused_windows: bool,
+     pub skip_cursor_only_updates_during_vrr: bool,
++    pub force_software_gamma: bool,
+ }
+ 
+ #[derive(knuffel::Decode, Debug, Default, PartialEq)]
+@@ -71,6 +72,8 @@ pub struct DebugPart {
+     pub deactivate_unfocused_windows: Option<Flag>,
+     #[knuffel(child)]
+     pub skip_cursor_only_updates_during_vrr: Option<Flag>,
++    #[knuffel(child)]
++    pub force_software_gamma: Option<Flag>,
+ }
+ 
+ impl MergeWith<DebugPart> for Debug {
+@@ -95,6 +98,7 @@ impl MergeWith<DebugPart> for Debug {
+             honor_xdg_activation_with_invalid_serial,
+             deactivate_unfocused_windows,
+             skip_cursor_only_updates_during_vrr,
++            force_software_gamma,
+         );
+ 
+         merge_clone_opt!((self, part), preview_render, render_drm_device);
+diff --git a/src/handlers/mod.rs b/src/handlers/mod.rs
+index 3532078..0e5e10d 100644
+--- a/src/handlers/mod.rs
++++ b/src/handlers/mod.rs
+@@ -72,6 +72,7 @@ use smithay::{
+     delegate_viewporter, delegate_virtual_keyboard_manager, delegate_xdg_activation,
+ };
+ 
++use crate::backend::Backend;
+ pub use crate::handlers::xdg_shell::KdeDecorationsModeState;
+ use crate::layout::workspace::WorkspaceId;
+ use crate::layout::ActivateWindow;
+@@ -89,6 +90,7 @@ use crate::protocols::virtual_pointer::{
+     VirtualPointerInputBackend, VirtualPointerManagerState, VirtualPointerMotionAbsoluteEvent,
+     VirtualPointerMotionEvent,
+ };
++use crate::render_helpers::software_gamma;
+ use crate::utils::{output_size, send_scale_transform};
+ use crate::{
+     delegate_ext_workspace, delegate_foreign_toplevel, delegate_gamma_control,
+@@ -743,20 +745,21 @@ impl GammaControlHandler for State {
+     }
+ 
+     fn get_gamma_size(&mut self, output: &Output) -> Option<u32> {
+-        match self.backend.tty().get_gamma_size(output) {
+-            Ok(0) => None, // Setting gamma is not supported.
+-            Ok(size) => Some(size),
+-            Err(err) => {
+-                warn!(
+-                    "error getting gamma size for output {}: {err:?}",
+-                    output.name()
+-                );
+-                None
+-            }
++        if let Some(size) = self.hardware_gamma_size(output) {
++            return Some(size);
+         }
++
++        // No hardware LUT (the Apple DCP has only CTM, which cannot express 3×1D ramps): apply
++        // the ramp in the render pipeline instead.
++        Some(software_gamma::GAMMA_SIZE)
+     }
+ 
+     fn set_gamma(&mut self, output: &Output, ramp: Option<Vec<u16>>) -> Option<()> {
++        if self.hardware_gamma_size(output).is_none() {
++            self.niri.set_software_gamma(output, ramp.as_deref());
++            return Some(());
++        }
++
+         match self.backend.tty().set_gamma(output, ramp) {
+             Ok(()) => Some(()),
+             Err(err) => {
+@@ -766,6 +769,31 @@ impl GammaControlHandler for State {
+         }
+     }
+ }
++
++impl State {
++    /// Size of the output's hardware gamma LUT, if it has a usable one.
++    fn hardware_gamma_size(&mut self, output: &Output) -> Option<u32> {
++        if self.niri.config.borrow().debug.force_software_gamma {
++            return None;
++        }
++
++        if !matches!(self.backend, Backend::Tty(_)) {
++            return None;
++        }
++
++        match self.backend.tty().get_gamma_size(output) {
++            Ok(0) => None, // Setting gamma is not supported.
++            Ok(size) => Some(size),
++            Err(err) => {
++                warn!(
++                    "error getting gamma size for output {}: {err:?}",
++                    output.name()
++                );
++                None
++            }
++        }
++    }
++}
+ delegate_gamma_control!(State);
+ 
+ struct UrgentOnlyMarker;
+diff --git a/src/niri.rs b/src/niri.rs
+index ec40e01..414d26e 100644
+--- a/src/niri.rs
++++ b/src/niri.rs
+@@ -155,6 +155,7 @@ use crate::render_helpers::blur::BlurOptions;
+ use crate::render_helpers::debug::push_opaque_regions;
+ use crate::render_helpers::primary_gpu_texture::PrimaryGpuTextureRenderElement;
+ use crate::render_helpers::renderer::NiriRenderer;
++use crate::render_helpers::software_gamma::{SoftwareGamma, SoftwareGammaElement};
+ use crate::render_helpers::solid_color::{SolidColorBuffer, SolidColorRenderElement};
+ use crate::render_helpers::surface::push_elements_from_surface_tree;
+ use crate::render_helpers::texture::TextureBuffer;
+@@ -481,6 +482,8 @@ pub struct OutputState {
+     pub lock_render_state: LockRenderState,
+     pub lock_surface: Option<LockSurface>,
+     pub lock_color_buffer: SolidColorBuffer,
++    /// Gamma ramp applied while rendering, when the output has no hardware LUT.
++    pub software_gamma: SoftwareGamma,
+     screen_transition: Option<ScreenTransition>,
+     /// Damage tracker used for the debug damage visualization.
+     pub debug_damage_tracker: OutputDamageTracker,
+@@ -2345,10 +2348,13 @@ impl Niri {
+         let background_effect_state = BackgroundEffectState::new::<State>(&display_handle);
+         let xdg_foreign_state = XdgForeignState::new::<State>(&display_handle);
+ 
+-        let is_tty = matches!(backend, Backend::Tty(_));
++        // Gamma is applied through the DRM LUT on a TTY, and in the render pipeline when there
++        // is none (or on winit, which has no DRM at all), so both of these can serve the
++        // protocol. Headless has no rendering to speak of.
++        let can_gamma = !matches!(backend, Backend::Headless(_));
+         let gamma_control_manager_state =
+             GammaControlManagerState::new::<State, _>(&display_handle, move |client| {
+-                is_tty && !client.get_data::<ClientState>().unwrap().restricted
++                can_gamma && !client.get_data::<ClientState>().unwrap().restricted
+             });
+         let activation_state = XdgActivationState::new::<State>(&display_handle);
+         event_loop
+@@ -2873,6 +2879,7 @@ impl Niri {
+             lock_render_state,
+             lock_surface: None,
+             lock_color_buffer: SolidColorBuffer::new(size, CLEAR_COLOR_LOCKED),
++            software_gamma: SoftwareGamma::new(),
+             screen_transition: None,
+             debug_damage_tracker: OutputDamageTracker::from_output(&output),
+         };
+@@ -3662,6 +3669,19 @@ impl Niri {
+         }
+     }
+ 
++    /// Sets the gamma ramp applied during rendering for an output.
++    ///
++    /// Used for outputs whose display controller has no gamma LUT of its own.
++    pub fn set_software_gamma(&mut self, output: &Output, ramp: Option<&[u16]>) {
++        let Some(state) = self.output_state.get_mut(output) else {
++            return;
++        };
++
++        if state.software_gamma.set_ramp(ramp) {
++            self.queue_redraw(output);
++        }
++    }
++
+     /// Schedules an immediate redraw if one is not already scheduled.
+     pub fn queue_redraw(&mut self, output: &Output) {
+         let state = self.output_state.get_mut(output).unwrap();
+@@ -4213,6 +4233,15 @@ impl Niri {
+             self.render_pointer(ctx.renderer, output, &mut |elem| push(elem.into()));
+         }
+ 
++        // Next, the software gamma ramp, if the output has no hardware LUT. It goes below the
++        // pointer so that the cursor can stay on its own plane: promoting it costs a full-output
++        // recomposite on every pointer move, which is a much worse trade than an untinted cursor.
++        if ctx.target == RenderTarget::Output {
++            if let Some(elem) = state.software_gamma.render(output_size(output)) {
++                push(elem.into());
++            }
++        }
++
+         // Next, the screen transition texture.
+         {
+             if let Some(transition) = &state.screen_transition {
+@@ -6523,6 +6552,7 @@ niri_render_elements! {
+         ScreenshotUi = ScreenshotUiRenderElement,
+         WindowMruUi = WindowMruUiRenderElement<R>,
+         ExitConfirmDialog = ExitConfirmDialogRenderElement,
++        SoftwareGamma = SoftwareGammaElement,
+         Texture = PrimaryGpuTextureRenderElement,
+         // Used for the CPU-rendered panels.
+         RelocatedMemoryBuffer = RelocateRenderElement<MemoryRenderBufferRenderElement<R>>,
+diff --git a/src/render_helpers/mod.rs b/src/render_helpers/mod.rs
+index 474437a..7c3e50f 100644
+--- a/src/render_helpers/mod.rs
++++ b/src/render_helpers/mod.rs
+@@ -46,6 +46,7 @@ pub mod shader_element;
+ pub mod shaders;
+ pub mod shadow;
+ pub mod snapshot;
++pub mod software_gamma;
+ pub mod solid_color;
+ pub mod surface;
+ pub mod texture;
+diff --git a/src/render_helpers/shaders/gamma_lut.frag b/src/render_helpers/shaders/gamma_lut.frag
+new file mode 100644
+index 0000000..e9afbb3
+--- /dev/null
++++ b/src/render_helpers/shaders/gamma_lut.frag
+@@ -0,0 +1,55 @@
++#version 100
++
++//_DEFINES_
++
++#if defined(EXTERNAL)
++#extension GL_OES_EGL_image_external : require
++#endif
++
++precision highp float;
++#if defined(EXTERNAL)
++uniform samplerExternalOES tex;
++#else
++uniform sampler2D tex;
++#endif
++
++uniform float alpha;
++varying vec2 v_coords;
++
++#if defined(DEBUG_FLAGS)
++uniform float tint;
++#endif
++
++// Gamma ramp as a lut_size × 1 texture: one texel per input level, the three
++// output channels in R, G and B.
++uniform sampler2D gamma_lut;
++// x = (lut_size - 1) / lut_size, y = 0.5 / lut_size; maps a [0, 1] color
++// channel onto the center of its texel.
++uniform vec2 gamma_lut_coords;
++
++void main() {
++    // Sample the captured framebuffer. It is opaque, so premultiplied and
++    // straight alpha are the same thing here.
++    vec4 color = texture2D(tex, v_coords);
++#if defined(NO_ALPHA)
++    color = vec4(color.rgb, 1.0);
++#endif
++
++    vec3 coords = clamp(color.rgb, 0.0, 1.0) * gamma_lut_coords.x + gamma_lut_coords.y;
++    color.r = texture2D(gamma_lut, vec2(coords.r, 0.5)).r;
++    color.g = texture2D(gamma_lut, vec2(coords.g, 0.5)).g;
++    color.b = texture2D(gamma_lut, vec2(coords.b, 0.5)).b;
++    // We are drawing over the very pixels we sampled, so replace rather than
++    // blend with them, whatever alpha they happened to have.
++    color.a = 1.0;
++
++    // Apply final alpha and tint.
++    color = color * alpha;
++
++#if defined(DEBUG_FLAGS)
++    if (tint == 1.0)
++        color = vec4(0.0, 0.2, 0.0, 0.2) + color * 0.8;
++#endif
++
++    gl_FragColor = color;
++}
+diff --git a/src/render_helpers/shaders/mod.rs b/src/render_helpers/shaders/mod.rs
+index 7be9b15..9c677e5 100644
+--- a/src/render_helpers/shaders/mod.rs
++++ b/src/render_helpers/shaders/mod.rs
+@@ -15,6 +15,7 @@ pub struct Shaders {
+     pub shadow: Option<ShaderProgram>,
+     pub clipped_surface: Option<GlesTexProgram>,
+     pub postprocess_and_clip: Option<GlesTexProgram>,
++    pub gamma_lut: Option<GlesTexProgram>,
+     pub resize: Option<ShaderProgram>,
+     pub gradient_fade: Option<GlesTexProgram>,
+     pub blur: Option<BlurProgram>,
+@@ -126,6 +127,19 @@ impl Shaders {
+             })
+             .ok();
+ 
++        let gamma_lut = renderer
++            .compile_custom_texture_shader(
++                include_str!("gamma_lut.frag"),
++                &[
++                    UniformName::new("gamma_lut", UniformType::_1i),
++                    UniformName::new("gamma_lut_coords", UniformType::_2f),
++                ],
++            )
++            .map_err(|err| {
++                warn!("error compiling gamma lut shader: {err:?}");
++            })
++            .ok();
++
+         let resize = compile_resize_program(renderer, include_str!("resize.frag"))
+             .map_err(|err| {
+                 warn!("error compiling resize shader: {err:?}");
+@@ -153,6 +167,7 @@ impl Shaders {
+             shadow,
+             clipped_surface,
+             postprocess_and_clip,
++            gamma_lut,
+             resize,
+             gradient_fade,
+             blur,
+diff --git a/src/render_helpers/software_gamma.rs b/src/render_helpers/software_gamma.rs
+new file mode 100644
+index 0000000..a692dff
+--- /dev/null
++++ b/src/render_helpers/software_gamma.rs
+@@ -0,0 +1,466 @@
++//! Software fallback for `zwlr_gamma_control_v1`.
++//!
++//! Some display controllers have no `GAMMA_LUT` CRTC property at all (the Apple
++//! DCP on Apple Silicon is the notable one: it only exposes `CTM`, and a 3×3
++//! matrix cannot express the 3×1D ramps of the protocol). On those, hardware
++//! gamma is simply unavailable and every night-light tool fails.
++//!
++//! This applies the ramp in the render pipeline instead: the composited output
++//! is captured into a texture and drawn back through a shader that looks every
++//! channel up in the ramp. Same idea as the wlroots software gamma fallback.
++//!
++//! The cost is that the whole output has to be recomposited whenever anything on
++//! it changes (a framebuffer effect covering the output cannot use partial
++//! damage), and that direct scanout is disabled while a ramp is set. Nothing is
++//! drawn, and nothing is paid for, when no client set a ramp.
++
++use std::cell::RefCell;
++use std::sync::Arc;
++
++use smithay::backend::allocator::Fourcc;
++use smithay::backend::renderer::element::{Element, Id, RenderElement};
++use smithay::backend::renderer::gles::{
++    ffi, GlesError, GlesFrame, GlesRenderer, GlesTexture, Uniform, UniformValue,
++};
++use smithay::backend::renderer::utils::CommitCounter;
++use smithay::backend::renderer::{
++    Frame as _, FrameContext, ImportMem as _, Offscreen, Texture as _,
++};
++use smithay::gpu_span_location;
++use smithay::utils::user_data::UserDataMap;
++use smithay::utils::{Buffer, Logical, Physical, Rectangle, Scale, Size, Transform};
++
++use crate::backend::tty::{TtyFrame, TtyRenderer, TtyRendererError};
++use crate::render_helpers::renderer::AsGlesFrame as _;
++use crate::render_helpers::shaders::Shaders;
++
++/// Ramp size advertised to gamma control clients when there's no hardware LUT.
++///
++/// One entry per 8-bit input level, which is exactly what the framebuffer can
++/// feed the shader, so this loses nothing compared to a bigger ramp.
++pub const GAMMA_SIZE: u32 = 256;
++
++/// Gamma ramp converted into the RGBA8 texture data of the LUT.
++#[derive(Debug)]
++struct Lut {
++    /// `GAMMA_SIZE` RGBA texels.
++    data: Vec<u8>,
++    /// Bumped on every change; used to re-upload the cached texture.
++    serial: u64,
++}
++
++/// Per-output software gamma state.
++#[derive(Debug)]
++pub struct SoftwareGamma {
++    id: Id,
++    commit: CommitCounter,
++    lut: Option<Arc<Lut>>,
++    next_serial: u64,
++}
++
++#[derive(Debug)]
++pub struct SoftwareGammaElement {
++    id: Id,
++    commit: CommitCounter,
++    geometry: Rectangle<f64, Logical>,
++    lut: Arc<Lut>,
++}
++
++#[derive(Debug, Default)]
++struct Inner {
++    /// Copy of the framebuffer below the element.
++    framebuffer: Option<GlesTexture>,
++    /// The ramp uploaded as a `GAMMA_SIZE` × 1 texture.
++    lut: Option<GlesTexture>,
++    /// Serial of the ramp currently in `lut`.
++    lut_serial: u64,
++    /// Whether the last capture succeeded.
++    captured: bool,
++}
++
++impl SoftwareGamma {
++    pub fn new() -> Self {
++        Self {
++            id: Id::new(),
++            commit: CommitCounter::default(),
++            lut: None,
++            next_serial: 1,
++        }
++    }
++
++    pub fn is_active(&self) -> bool {
++        self.lut.is_some()
++    }
++
++    /// Sets the gamma ramp, `None` to go back to no color transformation.
++    ///
++    /// Returns whether anything changed, i.e. whether a redraw is needed.
++    pub fn set_ramp(&mut self, ramp: Option<&[u16]>) -> bool {
++        let size = GAMMA_SIZE as usize;
++
++        let data = match ramp {
++            Some(ramp) => {
++                if ramp.len() != size * 3 {
++                    error!("wrong software gamma ramp length: {}", ramp.len());
++                    None
++                } else {
++                    let (red, rest) = ramp.split_at(size);
++                    let (green, blue) = rest.split_at(size);
++
++                    let mut data = Vec::with_capacity(size * 4);
++                    let mut identity = true;
++                    for i in 0..size {
++                        let (r, g, b) = (to_u8(red[i]), to_u8(green[i]), to_u8(blue[i]));
++                        // With one ramp entry per 8-bit level, a ramp that maps
++                        // every level onto itself is a no-op on the 8-bit
++                        // framebuffer. Clients leave such a ramp set whenever
++                        // night light is scheduled but currently inactive, and
++                        // rendering it would cost a full-output recomposite on
++                        // every frame for nothing.
++                        identity &= u32::from(r) == i as u32
++                            && u32::from(g) == i as u32
++                            && u32::from(b) == i as u32;
++
++                        data.push(r);
++                        data.push(g);
++                        data.push(b);
++                        data.push(u8::MAX);
++                    }
++
++                    if identity {
++                        trace!("identity software gamma ramp, not rendering it");
++                        None
++                    } else {
++                        Some(data)
++                    }
++                }
++            }
++            None => None,
++        };
++
++        match (&self.lut, &data) {
++            (None, None) => return false,
++            (Some(lut), Some(data)) if lut.data == *data => return false,
++            _ => (),
++        }
++
++        self.lut = data.map(|data| {
++            let serial = self.next_serial;
++            self.next_serial += 1;
++            Arc::new(Lut { data, serial })
++        });
++        self.commit.increment();
++
++        true
++    }
++
++    pub fn render(&self, output_size: Size<f64, Logical>) -> Option<SoftwareGammaElement> {
++        let lut = self.lut.clone()?;
++        Some(SoftwareGammaElement {
++            id: self.id.clone(),
++            commit: self.commit,
++            geometry: Rectangle::from_size(output_size),
++            lut,
++        })
++    }
++}
++
++impl Default for SoftwareGamma {
++    fn default() -> Self {
++        Self::new()
++    }
++}
++
++fn to_u8(value: u16) -> u8 {
++    ((u32::from(value) * 255 + 32767) / 65535) as u8
++}
++
++impl Element for SoftwareGammaElement {
++    fn id(&self) -> &Id {
++        &self.id
++    }
++
++    fn current_commit(&self) -> CommitCounter {
++        self.commit
++    }
++
++    fn src(&self) -> Rectangle<f64, Buffer> {
++        Rectangle::from_size(self.geometry.size.to_buffer(1., Transform::Normal))
++    }
++
++    fn geometry(&self, scale: Scale<f64>) -> Rectangle<i32, Physical> {
++        self.geometry.to_physical_precise_round(scale)
++    }
++
++    fn is_framebuffer_effect(&self) -> bool {
++        true
++    }
++}
++
++impl RenderElement<GlesRenderer> for SoftwareGammaElement {
++    fn capture_framebuffer(
++        &self,
++        frame: &mut GlesFrame<'_, '_>,
++        _src: Rectangle<f64, Buffer>,
++        dst: Rectangle<i32, Physical>,
++        cache: &UserDataMap,
++    ) -> Result<(), GlesError> {
++        let _span = tracy_client::span!("SoftwareGammaElement::capture_framebuffer");
++        let location = gpu_span_location!("SoftwareGammaElement::capture_framebuffer");
++        frame.with_gpu_span(location, |frame| {
++            let output_rect = Rectangle::from_size(frame.output_size());
++            let transform = frame.transformation();
++
++            let mut guard = frame.renderer();
++
++            let inner = cache.get_or_insert::<RefCell<Inner>, _>(|| RefCell::new(Inner::default()));
++            let mut inner = inner.borrow_mut();
++            let inner = &mut *inner;
++
++            inner.captured = false;
++
++            // Clamp to the framebuffer: glBlitFramebuffer skips out-of-bounds
++            // pixels. The element normally covers the output exactly, this is
++            // just in case rounding makes it a pixel bigger.
++            let Some(clamped_dst) = dst.intersection(output_rect) else {
++                return Ok(());
++            };
++
++            // Framebuffer coordinates of the region we're capturing.
++            let src_rect = transform.transform_rect_in(clamped_dst, &output_rect.size);
++            let size = src_rect.size.to_logical(1).to_buffer(1, Transform::Normal);
++
++            // Recreate the framebuffer copy if the size changed.
++            if inner
++                .framebuffer
++                .as_ref()
++                .is_some_and(|fb| fb.size() != size)
++            {
++                inner.framebuffer = None;
++            }
++            let framebuffer = if let Some(fb) = &inner.framebuffer {
++                fb
++            } else {
++                trace!("creating gamma framebuffer texture {} × {}", size.w, size.h);
++                let renderer = guard.as_mut();
++                let texture = renderer.create_buffer(Fourcc::Abgr8888, size)?;
++                inner.framebuffer.insert(texture)
++            };
++            let framebuffer_id = framebuffer.tex_id();
++
++            // Upload the ramp if it changed.
++            if inner.lut.is_none() || inner.lut_serial != self.lut.serial {
++                let renderer = guard.as_mut();
++                let size = Size::from((GAMMA_SIZE as i32, 1));
++                let texture =
++                    renderer.import_memory(&self.lut.data, Fourcc::Abgr8888, size, false)?;
++
++                // import_memory() leaves the default GL_NEAREST_MIPMAP_LINEAR
++                // min filter, which makes the texture incomplete (we have no
++                // mipmaps) and samples black. We also want no interpolation
++                // between ramp entries.
++                let tex_id = texture.tex_id();
++                renderer.with_context(|gl| unsafe {
++                    gl.BindTexture(ffi::TEXTURE_2D, tex_id);
++                    gl.TexParameteri(
++                        ffi::TEXTURE_2D,
++                        ffi::TEXTURE_MIN_FILTER,
++                        ffi::NEAREST as i32,
++                    );
++                    gl.TexParameteri(
++                        ffi::TEXTURE_2D,
++                        ffi::TEXTURE_MAG_FILTER,
++                        ffi::NEAREST as i32,
++                    );
++                    gl.BindTexture(ffi::TEXTURE_2D, 0);
++                })?;
++
++                inner.lut = Some(texture);
++                inner.lut_serial = self.lut.serial;
++            }
++
++            // We can't use renderer.with_context() as that will reset the GlesFrame binding that we
++            // want to blit from.
++            drop(guard);
++
++            frame.with_context(|gl| unsafe {
++                while gl.GetError() != ffi::NO_ERROR {}
++
++                let mut current_fbo = 0i32;
++                gl.GetIntegerv(ffi::DRAW_FRAMEBUFFER_BINDING, &mut current_fbo as *mut _);
++
++                // BlitFramebuffer is affected by the scissor test, we don't want that.
++                gl.Disable(ffi::SCISSOR_TEST);
++
++                let mut fbo = 0;
++                gl.GenFramebuffers(1, &mut fbo as *mut _);
++                gl.BindFramebuffer(ffi::DRAW_FRAMEBUFFER, fbo);
++
++                gl.FramebufferTexture2D(
++                    ffi::DRAW_FRAMEBUFFER,
++                    ffi::COLOR_ATTACHMENT0,
++                    ffi::TEXTURE_2D,
++                    framebuffer_id,
++                    0,
++                );
++
++                gl.BlitFramebuffer(
++                    src_rect.loc.x,
++                    src_rect.loc.y,
++                    src_rect.loc.x + src_rect.size.w,
++                    src_rect.loc.y + src_rect.size.h,
++                    0,
++                    0,
++                    size.w,
++                    size.h,
++                    ffi::COLOR_BUFFER_BIT,
++                    ffi::NEAREST,
++                );
++
++                // Restore state set by GlesFrame that we just modified.
++                gl.BindFramebuffer(ffi::DRAW_FRAMEBUFFER, current_fbo as u32);
++                gl.Enable(ffi::SCISSOR_TEST);
++
++                gl.DeleteFramebuffers(1, &mut fbo as *mut _);
++
++                if gl.GetError() != ffi::NO_ERROR {
++                    Err(GlesError::BlitError)
++                } else {
++                    Ok(())
++                }
++            })??;
++
++            inner.captured = true;
++
++            Ok(())
++        })
++    }
++
++    fn draw(
++        &self,
++        frame: &mut GlesFrame<'_, '_>,
++        _src: Rectangle<f64, Buffer>,
++        dst: Rectangle<i32, Physical>,
++        damage: &[Rectangle<i32, Physical>],
++        _opaque_regions: &[Rectangle<i32, Physical>],
++        cache: Option<&UserDataMap>,
++    ) -> Result<(), GlesError> {
++        let Some(cache) = cache else {
++            return Ok(());
++        };
++        let Some(inner) = cache.get::<RefCell<Inner>>() else {
++            return Ok(());
++        };
++        let inner = inner.borrow();
++
++        if !inner.captured {
++            return Ok(());
++        }
++        let (Some(texture), Some(lut)) = (&inner.framebuffer, &inner.lut) else {
++            return Ok(());
++        };
++
++        // Without the shader we can't transform anything; leave the framebuffer
++        // as it is rather than drawing an untransformed copy over itself.
++        let Some(program) = Shaders::get_from_frame(frame).gamma_lut.clone() else {
++            return Ok(());
++        };
++
++        // Clamp the same way as in capture_framebuffer().
++        let output_rect = Rectangle::from_size(frame.output_size());
++        let Some(clamped_dst) = dst.intersection(output_rect) else {
++            return Ok(());
++        };
++        let clamp_offset = clamped_dst.loc - dst.loc;
++
++        let mut damage = damage.to_vec();
++        if clamped_dst != dst {
++            let r = Rectangle::new(clamp_offset, clamped_dst.size);
++            damage.retain_mut(|d| {
++                if let Some(mut crop) = d.intersection(r) {
++                    crop.loc -= clamp_offset;
++                    *d = crop;
++                    true
++                } else {
++                    false
++                }
++            });
++        }
++        if damage.is_empty() {
++            return Ok(());
++        }
++
++        let size = GAMMA_SIZE as f32;
++        let uniforms = [
++            Uniform::new("gamma_lut", UniformValue::_1i(1)),
++            Uniform::new("gamma_lut_coords", ((size - 1.) / size, 0.5 / size)),
++        ];
++
++        // The shader samples the ramp from texture unit 1; unit 0 is the
++        // captured framebuffer, bound by render_texture_from_to() below.
++        let lut_id = lut.tex_id();
++        frame.with_context(|gl| unsafe {
++            gl.ActiveTexture(ffi::TEXTURE1);
++            gl.BindTexture(ffi::TEXTURE_2D, lut_id);
++            gl.ActiveTexture(ffi::TEXTURE0);
++        })?;
++
++        let transform = frame.transformation().invert();
++        let res = frame.render_texture_from_to(
++            texture,
++            Rectangle::from_size(texture.size().to_f64()),
++            clamped_dst,
++            &damage,
++            &[],
++            // The captured texture has the same transform as the frame.
++            transform,
++            1.,
++            Some(&program),
++            &uniforms,
++        );
++
++        frame.with_context(|gl| unsafe {
++            gl.ActiveTexture(ffi::TEXTURE1);
++            gl.BindTexture(ffi::TEXTURE_2D, 0);
++            gl.ActiveTexture(ffi::TEXTURE0);
++        })?;
++
++        res
++    }
++}
++
++impl<'render> RenderElement<TtyRenderer<'render>> for SoftwareGammaElement {
++    fn capture_framebuffer(
++        &self,
++        frame: &mut TtyFrame<'_, '_, '_>,
++        src: Rectangle<f64, Buffer>,
++        dst: Rectangle<i32, Physical>,
++        cache: &UserDataMap,
++    ) -> Result<(), TtyRendererError<'render>> {
++        let gles_frame = frame.as_gles_frame();
++        RenderElement::<GlesRenderer>::capture_framebuffer(&self, gles_frame, src, dst, cache)?;
++        Ok(())
++    }
++
++    fn draw(
++        &self,
++        frame: &mut TtyFrame<'_, '_, '_>,
++        src: Rectangle<f64, Buffer>,
++        dst: Rectangle<i32, Physical>,
++        damage: &[Rectangle<i32, Physical>],
++        opaque_regions: &[Rectangle<i32, Physical>],
++        cache: Option<&UserDataMap>,
++    ) -> Result<(), TtyRendererError<'render>> {
++        let gles_frame = frame.as_gles_frame();
++        RenderElement::<GlesRenderer>::draw(
++            &self,
++            gles_frame,
++            src,
++            dst,
++            damage,
++            opaque_regions,
++            cache,
++        )?;
++        Ok(())
++    }
++}
+-- 
+2.55.0
+

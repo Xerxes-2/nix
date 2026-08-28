@@ -60,6 +60,11 @@ let
   #   then:  drop this overrideAttrs and keep only the settings.json value
   #   last:  2026-08, dms-shell 1.5.3 - no such setting, DankBarWindow.qml
   #          still reads Theme.surfaceContainer
+  # Night light, in the renderer. See the long note next to `programs.niri`.
+  niri = pkgs.niri.overrideAttrs (old: {
+    patches = (old.patches or [ ]) ++ [ ./niri/software-gamma.patch ];
+  });
+
   dmsShell = pkgs.dms-shell.overrideAttrs (old: {
     postInstall = (old.postInstall or "") + ''
       substituteInPlace $out/share/quickshell/dms/Modules/DankBar/DankBarWindow.qml \
@@ -71,7 +76,10 @@ let
 in
 {
   # Wayland compositor + desktop shell.
-  programs.niri.enable = true;
+  programs.niri = {
+    enable = true;
+    package = niri;
+  };
   programs.dms-shell = {
     enable = true;
     package = dmsShell;
@@ -112,30 +120,43 @@ in
     powerOnBoot = false;
   };
 
-  # No night light here, on purpose. Apple's DCP display controller exposes only
-  # the CTM color matrix and no GAMMA_LUT, while niri implements
-  # zwlr_gamma_control_v1 through GAMMA_LUT only, so the whole class of tools -
-  # DMS night mode, wlsunset, gammastep - reports success and changes nothing:
+  # Night light needs a patched niri (the `niri` package in the let block above).
+  # Apple's DCP display controller exposes only the CTM color matrix and no
+  # GAMMA_LUT, while niri implements zwlr_gamma_control_v1 through GAMMA_LUT
+  # only, so the whole class of tools - DMS night mode, wlsunset, gammastep -
+  # reported success and changed nothing:
   #
   #   $ wlsunset -l -37.8 -L 144.9 -t 2000
   #   gamma control of output eDP-1 (44) failed
   #
-  # Installing one of them does not help; the fix has to come from niri (CTM
-  # support) or from the kernel. Emulating it from userspace means alpha
-  # blending a warm layer-shell surface over the screen, which cannot express a
-  # per-channel multiply: cutting blue by 25% costs 25% opacity, which lifts
-  # black into brown. Not worth it - keep DMS night mode switched off instead.
+  # CTM cannot stand in for the protocol's three 1D ramps - a 3x3 matrix has no
+  # per-level curve - which is why that request was closed. So the ramp has to
+  # be applied in the renderer instead: the patch advertises a 256-entry ramp
+  # (one entry per 8-bit framebuffer level, so nothing is lost against a
+  # hardware LUT) and runs it as a shader pass over the composited output, the
+  # same fallback wlroots grew in !5166.
+  #
+  # It is not free. While a ramp is set, the output loses partial damage (the
+  # pass has to see whole frames) and direct scanout, so a fullscreen video at
+  # night gets composited instead of being handed straight to the display. An
+  # identity ramp counts as no ramp, so night mode that is merely scheduled
+  # costs nothing during the day, and the cursor stays on its own plane - which
+  # also means the cursor itself stays untinted.
   #
   #   niri CTM request:  https://github.com/niri-wm/niri/issues/3672 (closed)
+  #   why not CTM:       https://gitlab.freedesktop.org/wlroots/wlroots/-/issues/1078
+  #   wlroots fallback:  https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5166
   #   Asahi kernel side: https://github.com/AsahiLinux/linux/issues/91
-  #   DMS software mode: https://github.com/AvengeMedia/DankMaterialShell/issues/2061
   #
-  # TODO revisit: when niri (or the DCP driver) grows CTM support
-  #   check: nix run nixpkgs#wlsunset -- -T 3000     # does the screen warm up?
-  #          journalctl --user -u niri | grep -i gamma
-  #   then:  nothing here to undo - just switch DMS night mode back on
-  #   last:  2026-08, niri 26.04 - still GAMMA_LUT-only, DMS night mode still
-  #          goes through zwlr_gamma_control
+  # TODO revisit: on every niri bump
+  #   check: whether the patch still applies (a failing build is the signal),
+  #          and whether upstream has grown its own software gamma:
+  #          `niri msg version` plus a look for `software_gamma` in the niri
+  #          source, or for a fallback in src/backend/tty.rs
+  #   then:  drop the overrideAttrs and hosts/asahi/niri/software-gamma.patch
+  #   test:  nix run nixpkgs#wlsunset -- -t 2000 -T 2001 -S 23:59 -s 00:01
+  #          should warm the screen within a second; Ctrl-C restores it
+  #   last:  2026-08, niri 26.04 - no upstream support, patch applies clean
 
   # geoclue 2.8 moved IP geolocation into a new [ip] section with a pluggable
   # `method`, and the NixOS module still only generates the pre-2.8 sections.
