@@ -6,16 +6,19 @@
 |---|---|---|
 | `oci` | Oracle Cloud 的 aarch64 服务器 | NixOS + Home Manager |
 | `asahi` | 14" MacBook Pro (M2 Pro) 上的 Asahi Linux | NixOS + Home Manager |
-| `xerxes2` | **同一台 MacBook 的 macOS 侧** | standalone Home Manager |
+| `XueMacBook-Pro` | **同一台 MacBook 的 macOS 侧** | nix-darwin + Home Manager |
 
-`asahi` 和 `xerxes2` 是同一台物理机器的两个系统——Asahi Linux 必须与 macOS 双启动，
-所以 macOS 那边也顺手纳入管理，共用 `modules/home/cli.nix` 那套 CLI 工具。
+`asahi` 和 `XueMacBook-Pro` 是同一台物理机器的两个系统——Asahi Linux 必须与 macOS 双启动，
+所以 macOS 那边也用 nix-darwin（Determinate Nix）管起来：系统级 GUI 应用、字体、
+homebrew（tap/formula/cask 全部声明式）、macOS defaults，外加作为模块运行的
+Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 
 **不要再用 `nix profile install nixpkgs#xxx` 散装**，否则机器状态会漂移。
 
 ## 仓库位置与版本控制
 
-两台 NixOS 机器上都在 **`/etc/nixos`**，都用 **jj**（colocated，git 作为后端）。
+两台 NixOS 机器上都在 **`/etc/nixos`**，macOS 侧在 **`~/.config/nix`**，
+都用 **jj**（colocated，git 作为后端）。
 
 `git log` / `git branch` 能看，但**不要用 git 改**：colocated 仓库的 git HEAD 永远是
 detached 的，那是 jj 的正常状态而非故障，用 `git checkout` / `git reset` 去"修"会和
@@ -24,7 +27,7 @@ jj 的工作副本打架。
 ## 结构
 
 ```
-├── flake.nix               # 入口：定义 oci / asahi / xerxes2
+├── flake.nix               # 入口：定义 oci / asahi / XueMacBook-Pro
 ├── hosts/oci/
 │   ├── configuration.nix   # NixOS 入口，imports 下面的模块
 │   ├── boot.nix filesystems.nix network.nix users.nix packages.nix
@@ -45,6 +48,9 @@ jj 的工作副本打架。
 │   ├── dms/settings.nix    # DMS 首次启动的初始布局
 │   ├── home.nix            # xerxes2 用户的 Home Manager
 │   └── steam/              # Fedora Asahi 游戏栈容器（FEX + muvm），见其 README
+├── hosts/darwin/
+│   ├── configuration.nix   # nix-darwin 入口：GUI 应用、字体、homebrew、defaults
+│   └── home.nix            # xerxes2 用户的 Home Manager（fish/starship/git/gpg…）
 ├── modules/
 │   ├── home/cli.nix        # 跨机器共享的 CLI 工具集
 │   └── unfree.nix          # unfree 包白名单
@@ -63,6 +69,9 @@ jj 的工作副本打架。
 | asahi 的 GUI 程序、字体 | `hosts/asahi/gui.nix` |
 | asahi 的输入法相关 | `hosts/asahi/input.nix` |
 | asahi 上与 macOS 双启动相关的工具 | `hosts/asahi/dualboot.nix` |
+| macOS 的 GUI 应用、字体（nixpkgs 有的） | `hosts/darwin/configuration.nix` |
+| macOS 特有的 CLI 工具 | `hosts/darwin/home.nix` |
+| nixpkgs 没有/只能用 brew 的（cask、专有字体） | `hosts/darwin/configuration.nix` 的 homebrew 块 |
 
 找包名：https://search.nixos.org 或 `nix search nixpkgs xxx`。
 
@@ -75,12 +84,13 @@ jj 的工作副本打架。
 sudo nixos-rebuild switch --flake /etc/nixos          # 本机
 ```
 
-xerxes2（macOS 侧，standalone home-manager）：
+macOS 侧（nix-darwin，主机名 XueMacBook-Pro 能对上 attribute，`#…` 可省）：
 ```bash
-nix run home-manager -- switch --flake /etc/nixos#xerxes2
+sudo darwin-rebuild switch --flake ~/.config/nix
 ```
 
-> 用 `sudo` 时 `~` 会展开成 `/root`，写绝对路径 `/etc/nixos`。
+> 在 NixOS 上用 `sudo` 时 `~` 会展开成 `/root`，写绝对路径 `/etc/nixos`；
+> macOS 的 sudo 保留用户的 `$HOME`，`~/.config/nix` 没问题。
 
 ## 在另一台机器上同步
 
@@ -195,6 +205,15 @@ sudo nixos-rebuild switch --flake /etc/nixos#<target>
 
 asahi 还需要 `/boot/vendorfw/firmware.cpio` 存在（由 Asahi 安装器写入），
 以及一份本机生成的 `hosts/asahi/hardware-configuration.nix`。
+
+macOS 侧（先装 Determinate Nix 和 homebrew）：
+
+```bash
+jj git clone --colocate https://github.com/Xerxes-2/nix.git ~/.config/nix
+sudo nix run nix-darwin/master#darwin-rebuild -- switch --flake ~/.config/nix
+```
+
+第一次 switch 之后 `darwin-rebuild` 就在 PATH 里了。
 
 ## 清理磁盘
 

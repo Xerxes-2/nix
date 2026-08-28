@@ -11,5 +11,9 @@
       "claude-code"
       # Widevine CDM，asahi 的浏览器放 DRM 流媒体要用；见 hosts/asahi/gui.nix。
       "widevine-cdm"
+      # 以下为 darwin 侧 GUI 应用：
+      # BUSL 许可证的 ZeroTier 客户端；压缩工具 Keka。
+      "zerotierone"
+      "keka"
     ];
 }

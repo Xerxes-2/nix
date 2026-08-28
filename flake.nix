@@ -20,6 +20,14 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
+    nix-darwin = {
+      url = "github:nix-darwin/nix-darwin/master";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+    determinate = {
+      url = "https://flakehub.com/f/DeterminateSystems/determinate/3";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
     sops-nix = {
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
@@ -32,6 +40,8 @@
       nixpkgs-unstable,
       home-manager,
       sops-nix,
+      nix-darwin,
+      determinate,
       ...
     }@inputs:
     let
@@ -90,20 +100,18 @@
         ];
       };
 
-      # MacBook（Apple Silicon，Determinate Nix）：standalone home-manager 入口。
-      # 使用：nix run home-manager -- switch --flake ~/nixcfg#xerxes2
-      # 如果某个共享包在 darwin 上不可用/不需要，在下面 home.nix 里排除即可。
-      # 将来若想升级到 nix-darwin，这份 home 配置可原样挪进其 HM 模块。
-      homeConfigurations."xerxes2" = home-manager.lib.homeManagerConfiguration {
-        pkgs = nixpkgs-unstable.legacyPackages.aarch64-darwin;
+      # MacBook（Apple Silicon，Determinate Nix）：macOS 侧，nix-darwin 接管，
+      # Home Manager 作为其模块运行（曾是 standalone home-manager 入口）。
+      # 使用：sudo darwin-rebuild switch --flake ~/.config/nix
+      darwinConfigurations."XueMacBook-Pro" = nix-darwin.lib.darwinSystem {
+        system = "aarch64-darwin";
+        specialArgs = { inherit self; };
         modules = [
+          determinate.darwinModules.default
+          home-manager.darwinModules.home-manager
           ./modules/unfree.nix
-          ./modules/home/cli.nix
-          {
-            home.username = "xerxes2";
-            home.homeDirectory = "/Users/xerxes2";
-            home.stateVersion = "26.05";
-          }
+          ./hosts/darwin/configuration.nix
+          ./hosts/darwin/home.nix
         ];
       };
     };
