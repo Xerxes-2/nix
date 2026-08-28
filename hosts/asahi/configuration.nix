@@ -9,6 +9,7 @@
     ./gui.nix
     ./input.nix
     ./containers.nix
+    ./avd.nix
     ./power.nix
     ./network.nix
   ];
