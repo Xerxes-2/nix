@@ -6,6 +6,7 @@
     # `sudo nixos-generate-config --show-hardware-config | tee hardware-configuration.nix`.
     ./hardware-configuration.nix
     ./filesystems.nix
+    ../../modules/btrfs-tools.nix
     ./gui.nix
     ./input.nix
     ./containers.nix

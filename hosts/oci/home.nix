@@ -8,9 +8,6 @@
   home-manager.users.ubuntu = { pkgs, ... }: {
     imports = [ ../../modules/home/cli.nix ];
     home.stateVersion = "26.05";
-    home.packages = with pkgs; [
-      btdu # btrfs 专用，Linux only
-    ];
 
     # dufs 文件服务器（从 rootless 容器迁入，2026-08）。
     # 配置含 auth 凭据，故 ~/.config/dufs/config.yaml 不纳管、不进 git；

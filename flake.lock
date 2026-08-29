@@ -300,6 +300,7 @@
         "nixos-apple-silicon": "nixos-apple-silicon",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "sops-nix": "sops-nix",
+        "xsz": "xsz",
         "zen-browser": "zen-browser"
       }
     },
@@ -320,6 +321,26 @@
       "original": {
         "owner": "Mic92",
         "repo": "sops-nix",
+        "type": "github"
+      }
+    },
+    "xsz": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs-unstable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1784788005,
+        "narHash": "sha256-dBqfdNqCu99zNvRVNZTTl0eChz9vPR+v8X+hkl4ZinY=",
+        "owner": "SaltyKitkat",
+        "repo": "xsz",
+        "rev": "42bd069034df70a02339663add10c5a331008c31",
+        "type": "github"
+      },
+      "original": {
+        "owner": "SaltyKitkat",
+        "repo": "xsz",
         "type": "github"
       }
     },

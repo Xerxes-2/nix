@@ -50,6 +50,7 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 │   └── home.nix            # xerxes2 用户的 Home Manager（fish/starship/git/gpg…）
 ├── modules/
 │   ├── home/cli.nix        # 跨机器共享的 CLI 工具集
+│   ├── btrfs-tools.nix     # btdu + xsz，两台 NixOS 共用（系统级，Linux only）
 │   └── unfree.nix          # unfree 包白名单
 ├── scripts/
 │   └── flake-update.sh     # 更新 flake.lock 并把改了什么写进提交信息
@@ -76,6 +77,28 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 **asahi**：`@` / `@home` / `@nix`，`compress-force=zstd:1`（等级选型的实测数据写在
 `hosts/asahi/filesystems.nix` 的注释里）。无快照。
 
+### 看空间到底被谁占了
+
+`df` 和 `du` 在这上面都会骗人：`du` 不知道 extent 被多个子卷共享，`df` 只给全盘
+数字，两者都不看压缩。两个工具装在 `modules/btrfs-tools.nix`：
+
+- `btdu` —— 采样式统计「谁占了空间」，交互式钻目录树，找占地大户
+- `xsz` —— 精确核算一组文件的实际占用，把压缩、reflink、被部分覆盖的 extent 都算进去；
+  在子卷根上加 `-t` 直接扫 tree，比走目录层级快很多
+
+具体例子：上面那次子卷重排后删掉 `@` 里的老 `/nix`，`df` 几乎没变——因为拷贝是
+reflink 的，extent 还被 `@nix` 引用着。这种「删了但没释放」只有 `xsz` 能说清。
+
+两个都得以 root 跑（btrfs 的 SEARCH_V2 ioctl 要 CAP_SYS_ADMIN），所以走
+`environment.systemPackages` 而不是 `home.packages`——后者落在
+`/etc/profiles/per-user/<user>/bin`，那不在 root 的 PATH 里，`sudo -i` 或 `su -`
+之后就找不到命令。`sudo xsz` 能用只是因为这两台没配 `secure_path`。
+
+`xsz` 不在 nixpkgs 里，从第三方 flake 进来（`inputs.xsz`），只出 Linux，所以也没放进
+darwin 也在用的 `modules/home/cli.nix`。
+
+`btdu` 还要求路径挂在 `subvolid=5`（顶层子卷）上，直接对 `/` 跑会被拒。
+
 ### 再改布局的话
 
 改布局要搬数据，不是改个 `.nix` 就完事。oci 那次（`@` → 拆出 `@nix` + `@varlib`）
@@ -100,7 +123,8 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 | 场景 | 文件 |
 |---|---|
 | 所有机器都要的 CLI 工具（git、htop、bat、yazi…） | `modules/home/cli.nix` |
-| 仅 oci 用户需要的工具（btdu…） | `hosts/oci/home.nix` |
+| 两台 NixOS 都要的 btrfs 工具（btdu、xsz） | `modules/btrfs-tools.nix` |
+| 仅 oci 用户需要的工具 | `hosts/oci/home.nix` |
 | oci 服务器/btrfs 专用或须系统级的包 | `hosts/oci/packages.nix` |
 | asahi 的 GUI 程序、字体 | `hosts/asahi/gui.nix` |
 | asahi 的输入法相关 | `hosts/asahi/input.nix` |

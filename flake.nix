@@ -32,6 +32,12 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
+    # btrfs 实际占用核算（压缩 / reflink / 部分覆盖的 extent 都算进去），
+    # 不在 nixpkgs 里。两台 NixOS 机器都用，见 modules/btrfs-tools.nix。
+    xsz = {
+      url = "github:SaltyKitkat/xsz";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
   };
 
   outputs =
@@ -77,6 +83,7 @@
 
       nixosConfigurations.oci = nixpkgs-unstable.lib.nixosSystem {
         inherit system;
+        specialArgs = { inherit inputs; };
         modules = [
           home-manager.nixosModules.home-manager
           sops-nix.nixosModules.sops

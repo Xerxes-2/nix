@@ -8,6 +8,7 @@
     ./network.nix
     ./users.nix
     ./packages.nix
+    ../../modules/btrfs-tools.nix
     ./services/wakapi.nix
     ./services/sillytavern.nix
     ./services/restic.nix
