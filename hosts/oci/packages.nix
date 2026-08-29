@@ -24,14 +24,14 @@
     options = "--delete-older-than 14d";
   };
 
-  # 只留服务器/btrfs 专用与必须系统级的包；
-  # 通用 CLI 工具都在 modules/home/cli.nix（跨机器共享）。
+  # 只留服务器专用与必须系统级的包；
+  # 通用 CLI 工具在 modules/home/cli.nix（跨机器共享），
+  # 两台 NixOS 共用的 btrfs 工具（btdu、xsz）在 modules/btrfs-tools.nix。
   environment.systemPackages = with pkgs; [
     bottom # btm
     btrfs-progs
     bubblewrap
     chromium
-    compsize
     duperemove
     fio
     kitty.terminfo # SSH 会话按 /etc/terminfo 查找，须留系统级
