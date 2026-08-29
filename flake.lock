@@ -29,6 +29,7 @@
       },
       "original": {
         "owner": "Xerxes-2",
+        "ref": "paper-v1",
         "repo": "chive-rs",
         "type": "github"
       }

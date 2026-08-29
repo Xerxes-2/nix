@@ -41,8 +41,12 @@
     # 自己的交易盒子，oci 上跑 `chive paper` 做虚拟仓验证。它的 flake 只出包、
     # 不出服务模块：哪个子卷放不可再生的 Archive、哪个放可重下的行情缓存，
     # 是本机的事，写在 hosts/oci/services/chive.nix。
+    # 钉在 tag 而不是默认分支：flake.lock 本来就按住了 rev，但 flake-update
+    # 不带参数时会把所有输入抬到各自分支的头 —— 那会把虚拟仓的二进制
+    # 顺手换成上游此刻正在写的任何东西。tag 不动，所以 update 对它是空操作，
+    # 换版变成改这一行的一次有意识的提交（并接受那次重编）。
     chive = {
-      url = "github:Xerxes-2/chive-rs";
+      url = "github:Xerxes-2/chive-rs/paper-v1";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
   };
