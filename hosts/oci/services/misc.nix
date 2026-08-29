@@ -38,8 +38,8 @@
   # 保留策略克制：bees 的去重开销随快照数增长，快照也会钉住已删数据。两个 config
   # 用同一套限额，快照总数翻倍——数据量小，这点开销换对称和好记是划算的。
   #
-  # 每个被快照的子卷都要有各自的 .snapshots 子卷，首次启用前手动建
-  # （scripts/oci-btrfs-relayout.sh 的 phase 里已经代劳）：
+  # 每个被快照的子卷都要有各自的 .snapshots 子卷。这两个已经建好了；以后再加
+  # config 的话要先手动跑（声明式配置盖不到这一步）：
   #   btrfs subvolume create /home/.snapshots
   #   btrfs subvolume create /var/lib/.snapshots
   services.snapper = {

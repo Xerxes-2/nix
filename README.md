@@ -52,8 +52,7 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 │   ├── home/cli.nix        # 跨机器共享的 CLI 工具集
 │   └── unfree.nix          # unfree 包白名单
 ├── scripts/
-│   ├── flake-update.sh     # 更新 flake.lock 并把改了什么写进提交信息
-│   └── oci-btrfs-relayout.sh  # 一次性：从 @ 拆出 @nix / @varlib（见下节）
+│   └── flake-update.sh     # 更新 flake.lock 并把改了什么写进提交信息
 └── secrets/oci.yaml        # sops 加密的秘密
 ```
 
@@ -77,20 +76,22 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 **asahi**：`@` / `@home` / `@nix`，`compress-force=zstd:1`（等级选型的实测数据写在
 `hosts/asahi/filesystems.nix` 的注释里）。无快照。
 
-改布局要搬数据，不是改个 `.nix` 就完事。oci 那次的脚本留在
-`scripts/oci-btrfs-relayout.sh`，分 6 个 phase、每步前确认，可以当模板改：
+### 再改布局的话
 
-```bash
-sudo /etc/nixos/scripts/oci-btrfs-relayout.sh    # phase 1-4：体检 → 建子卷 → 构建新一代 → 停机拷贝
-sudo reboot
-sudo /etc/nixos/scripts/oci-btrfs-relayout.sh --verify    # 检查挂载点和服务
-# 观察几天
-sudo /etc/nixos/scripts/oci-btrfs-relayout.sh --cleanup   # 删掉 @ 里的老副本
-```
+改布局要搬数据，不是改个 `.nix` 就完事。oci 那次（`@` → 拆出 `@nix` + `@varlib`）
+的脚本已经删了——它硬编码了 UUID，且 phase 4 的 `rsync --delete` 在迁移完成后源目录
+已空，再跑一次会把 `@varlib` 里的服务状态全抹掉。要找它：提交 `zroqpkvk` 的父提交。
 
-关键性质：`--cleanup` 之前老数据一直留在 `@/nix` 和 `@/var/lib`，新一代启不起来就
-在 GRUB 里选上一代（它的 stage-1 不挂 `@nix`/`@varlib`，会照常用老副本）。反过来，
-`--cleanup` 之后迁移前的 generation 就永久启不起来了。
+重写时要保留的四个要点：
+
+1. **先 `nixos-rebuild boot`，再拷贝。** rebuild 会往还活着的老 `/nix` 写新 store 路径，
+   拷贝必须发生在它之后，新一代才拿得到自己需要的东西。
+2. **`cp -a --reflink=always`，源路径取子卷原位置**（`subvolid=5` 挂下的 `@/nix`），
+   不走 `/nix/store` 那层 ro bind mount。`-a` 含 `--preserve=links`，
+   `nix-store --optimise` 的硬链接保得住；reflink 让副本共享 extent。
+3. **老数据先留着，分开一阶清理。** 新一代启不起来就在 GRUB 里选上一代——它的 stage-1
+   不挂新子卷，会照常用 `@` 里的老副本。清理之后这条路就没了。
+4. **清理时只能清空目录，不能删目录**（见下面那条坑）。
 
 ## 加一个包
 
@@ -318,6 +319,13 @@ Git`）。跑一条 `jj st` 即可，原理见 `AGENTS.md`。
 
 **改了挂载选项要重启才生效。** `nixos-rebuild switch` 不会重挂已挂载的文件系统；
 压缩也只对之后写入的数据生效。
+
+**从 `subvolid=5` 下删东西时，删不掉充当挂载点的那个目录。** 比如把顶层挂在
+`/mnt/top` 后，`rm -rf /mnt/top/@/nix` 会报 `Device or resource busy`，尽管
+`mountpoint /mnt/top/@/nix` 说它不是挂载点。因为 btrfs 整个 fs 共用一个 superblock、
+各子卷挂载共享 dcache，这个路径和 `/` 上被 `/nix` 盖住的目录是同一个 dentry，
+而内核判 EBUSY 看 dentry 不看路径。内容删得掉，目录本身删不掉——也不应该删，
+没它 `/nix` 没地方挂。用 `find <dir> -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +`。
 
 ## 复查清单（TODO）
 
