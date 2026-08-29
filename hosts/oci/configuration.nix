@@ -15,6 +15,7 @@
     ./services/cloudflared.nix
     ./services/vaultwarden.nix
     ./services/ntfy.nix
+    ./services/chive.nix
     ./services/misc.nix
   ];
 }

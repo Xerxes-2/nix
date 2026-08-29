@@ -28,9 +28,10 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 ├── hosts/oci/
 │   ├── configuration.nix   # NixOS 入口，imports 下面的模块
 │   ├── boot.nix filesystems.nix network.nix users.nix packages.nix
-│   ├── services/           # wakapi / sillytavern / vaultwarden / ntfy / restic / cloudflared / misc
+│   ├── services/           # wakapi / sillytavern / vaultwarden / ntfy / restic / cloudflared / chive / misc
 │   ├── home.nix            # ubuntu 用户的 Home Manager（含 dufs）
-│   └── sillytavern.yaml    # SillyTavern 配置（无机密，进 git）
+│   ├── sillytavern.yaml    # SillyTavern 配置（无机密，进 git）
+│   └── chive.toml          # chive 虚拟仓配置（无机密，进 git）
 ├── hosts/asahi/
 │   ├── configuration.nix   # NixOS 入口，imports 下面的模块
 │   ├── hardware-configuration.nix   # 生成的，别手改
@@ -65,10 +66,10 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 |---|---|---|---|
 | `@` | `/` | — | 可从 flake 重建，不值得快照 |
 | `@nix` | `/nix` | — | store，全盘最大且完全可复现 |
-| `@varlib` | `/var/lib` | snapper `varlib` | vaultwarden / wakapi / SillyTavern / ntfy 的状态 |
+| `@varlib` | `/var/lib` | snapper `varlib` | vaultwarden / wakapi / SillyTavern / ntfy 的状态，以及 chive 的账本 |
 | `@home` | `/home` | snapper `home` | dufs-data |
 | `@log` | `/var/log` | — | journald 限 500M |
-| `@cache` | `/var/cache` | — | |
+| `@cache` | `/var/cache` | — | chive 的 aggTrades 缓存（数 GB，可重下，故不快照不备份） |
 | `@tmp` | `/var/tmp` | — | `/tmp` 是 tmpfs，不在盘上 |
 
 快照保留：每小时一张，留 6 小时 + 7 天。克制是因为 bees 去重开销随快照数增长，
@@ -286,7 +287,7 @@ asahi 保留 30 天、oci 保留 14 天），正常不需要手动跑。
 
 ## 服务出问题时会推送到手机（ntfy）
 
-`hosts/oci/services/ntfy.nix`：oci 上跑 ntfy 服务端，13 个关键单元挂了 `OnFailure=`，
+`hosts/oci/services/ntfy.nix`：oci 上跑 ntfy 服务端，14 个关键单元挂了 `OnFailure=`，
 失败时把 `systemctl status` 的尾巴推到 topic **`oci-alerts`**。
 
 订阅（手机装 ntfy app，或浏览器开 https://ntfy.xerxes2.com）：
@@ -320,6 +321,44 @@ sudo systemctl start 'notify-failure@sshd.service.service'
 
 **两个覆盖不到的盲区**：ntfy 自己挂了、整台机器失联——这两种情况没人能发出告警。
 要补需要外部的 dead-man's switch（healthchecks.io 之类，或另一台机器上的 gatus）。
+
+## 虚拟仓（chive paper）
+
+`hosts/oci/services/chive.nix` + `hosts/oci/chive.toml`。跟着币安公开成交流跑一个模拟账本：
+不下单、不签名、不读私钥，所以 sops 里没有它的东西。策略是 `breakout`（BTC/ETH 各 500）。
+
+| 东西 | 位置 | 为何 |
+|---|---|---|
+| 账本（唯一真状态） | `/var/lib/chive/archive/*.toml` | 几 KB，每 60 秒原子重写；白拿 snapper 快照 + restic 异地 |
+| aggTrades 缓存 | `/var/cache/chive`（经 `…/chive/aggtrades` symlink） | 数 GB 公开档案，可重下；不快照不备份，180 天按龄清理 |
+| 配置 | git 里那份，每次启动覆盖到 `/var/lib/chive/chive.toml` | 直接改机器上那份会被覆盖 |
+
+**首次启动要热身**：拉 56 天 aggTrades 建 Channel（6-8 GB CSV，压缩后少很多），
+这段时间结构上不可能成交（种子期），几分钟后进 live。
+
+**一两个月没任何成交是正常的**：这条规则六年回测里平均每 symbol 每年只开 3.5 笔、
+在场率 34%。判断它活着看的是面板的 `Marked at` 时间而不是成交数：
+
+```bash
+journalctl -fu chive-paper                 # 日志（非 TTY 下面板降级为纯日志）
+cat /var/lib/chive/archive/BTCUSDT.toml    # 账本本身就是给人读的：saved_at / 持仓 / Risk Line
+```
+
+**拒绝启动会叫醒你**：档案被改过、截断、版本与配置不符、两个 tenant 的段同时在场，
+chive 会拒绝启动而不是静默重建一个空策略。`Restart=always` 配 5 次/小时的上限，
+超过就进 failed → ntfy。升级（`nixos-rebuild switch`）无需手工步骤：
+旧进程被杀与干净停止同义，新进程恢复账本、catch-up 自动补缺口。
+
+**对账**（虚拟仓跑了一段时间之后）：同一个二进制已在 PATH 里。自己弄个工作目录：
+Backtest 要往当前目录写 CSV，而 `/var/lib/chive` 是 chive 用户的。
+
+```bash
+mkdir -p ~/chive-check && cd ~/chive-check
+ln -sfn /var/cache/chive aggtrades              # 复用服务已经下好的行情
+cp /var/lib/chive/rules-snapshot.toml .         # Backtest 拒绝在没有它的情况下跑
+chive backtest --strategy breakout \
+  --symbol BTC/USDT --from <虚拟仓首日> --to <今天> --principal 500
+```
 
 ## 已知的坑
 

@@ -21,6 +21,9 @@
       "/var/lib/SillyTavern"
       # vaultwarden 备的是模块 23:00 生成的 sqlite 安全副本，不是运行中的库
       "/var/backup/vaultwarden"
+      # 虚拟仓的账本（几 KB）。里面的 aggtrades 是指向 @cache 的 symlink，
+      # restic 不会跟进去，所以几 GB 可重下的行情缓存不会被传上去。
+      "/var/lib/chive"
       "/home/ubuntu/.config"
       "/etc"
     ];

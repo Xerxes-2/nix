@@ -38,6 +38,13 @@
       url = "github:SaltyKitkat/xsz";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
+    # 自己的交易盒子，oci 上跑 `chive paper` 做虚拟仓验证。它的 flake 只出包、
+    # 不出服务模块：哪个子卷放不可再生的 Archive、哪个放可重下的行情缓存，
+    # 是本机的事，写在 hosts/oci/services/chive.nix。
+    chive = {
+      url = "github:Xerxes-2/chive-rs";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
   };
 
   outputs =

@@ -21,6 +21,8 @@ let
     "vaultwarden"
     "wakapi"
     "sillytavern"
+    # 一个不可信的 Archive 会让它拒绝启动而不是静默重建 —— 那正是最该被叫醒的时刻
+    "chive-paper"
     "btrfs-scrub--" # 单元名由挂载点 "/" 转义而来（escapeSystemdPath）
     "snapper-timeline"
     "snapper-cleanup"

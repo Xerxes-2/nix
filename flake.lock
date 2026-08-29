@@ -13,6 +13,26 @@
         "type": "path"
       }
     },
+    "chive": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs-unstable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1788009424,
+        "narHash": "sha256-wJ8IvoNTwTbJW3z/193t/fLp+19CdNQa38q563eTHhw=",
+        "owner": "Xerxes-2",
+        "repo": "chive-rs",
+        "rev": "987384ba3792a1bd9ffc1e8174375eb261e4e266",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Xerxes-2",
+        "repo": "chive-rs",
+        "type": "github"
+      }
+    },
     "determinate": {
       "inputs": {
         "determinate-nixd-aarch64-darwin": "determinate-nixd-aarch64-darwin",
@@ -294,6 +314,7 @@
     "root": {
       "inputs": {
         "asahi-firmware": "asahi-firmware",
+        "chive": "chive",
         "determinate": "determinate",
         "home-manager": "home-manager",
         "nix-darwin": "nix-darwin",

@@ -1,0 +1,31 @@
+# chive 虚拟仓（Paper）的配置。由 chive-paper.service 在每次启动时复制到
+# /var/lib/chive/chive.toml —— 也就是说这里是唯一的真源，直接改机器上那份会被覆盖。
+#
+# 故意不写 api_key / secret_path：Paper 不签任何东西（它连私钥都不读，
+# 状态栏里那行就写着 "Paper signs nothing"），所以这个服务的密钥面是空的。
+
+# 两个流动性最好的现货对，也是六年回测与九门裁决用的同一组。
+symbols = [
+    "BTC/USDT",
+    "ETH/USDT",
+]
+
+# 每个 symbol 各自的本金，与回测口径一致（票 81 是每 symbol 500、合并 1000 参考）。
+# 字符串而非数字：账目一律走十进制，不碰浮点。
+init_principal = "500"
+
+# Archive v2 的开关。关掉它 Breakout 每次重启都要重新热身 56 天、
+# 并且忘掉手上的 Holding —— 对虚拟仓验证等于没在验证。
+enable_saving = true
+
+# 票 83 加的 tenant 选择键。缺省是 grid；这里要的是通过九门的那条规则。
+strategy = "breakout"
+
+# 真盘行情（Paper 只读公开流，不下单到任何地方）。
+test_mode = false
+
+# WebSocket 连接池：两个 symbol 两条连接。
+pool_size = 2
+
+# 没有 [grid] 表：strategy = "breakout" 下它不会被读取，
+# 留一份不生效的梯子参数只会让下一个读到的人以为它有用。
