@@ -248,7 +248,7 @@ in
   #   check: grep -A2 '^\[ip\]' /etc/geoclue/geoclue.conf
   #          journalctl -u geoclue | grep 'Unknown IP source'
   #   then:  delete this conf.d file once the module emits the section itself
-  #   last:  2026-08, geoclue 2.8.1 - module still emits only
+  #   last:  2026-08, geoclue 2.8.2 - module still emits only
   #          network-nmea/3g/cdma/modem-gps/wifi/static-source
   environment.etc."geoclue/conf.d/10-ip-source.conf".text = ''
     [ip]
