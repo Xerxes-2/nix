@@ -30,6 +30,8 @@ let
     "nix-gc"
     "nix-optimise"
     "fail2ban"
+    # 监控自己挂了最容易静默：控制台图表只是变平，不会报警
+    "oracle-cloud-agent"
     # 故意不含 ntfy-sh 自己：它挂了就没人能发这条告警，挂上去只是自欺。
     # 「整台机器失联」同理需要外部 dead-man's switch，见 README。
   ];

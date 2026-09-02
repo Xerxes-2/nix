@@ -11,6 +11,9 @@
       "claude-code"
       # Widevine CDM，asahi 的浏览器放 DRM 流媒体要用；见 hosts/asahi/gui.nix。
       "widevine-cdm"
+      # OCI 实例指标上报的闭源二进制（从 Oracle 的 snap 解包）；
+      # 见 hosts/oci/services/oracle-cloud-agent.nix。
+      "oracle-cloud-agent"
       # 以下为 darwin 侧 GUI 应用：
       # BUSL 许可证的 ZeroTier 客户端；压缩工具 Keka。
       "zerotierone"

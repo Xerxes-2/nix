@@ -28,7 +28,7 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 ├── hosts/oci/
 │   ├── configuration.nix   # NixOS 入口，imports 下面的模块
 │   ├── boot.nix filesystems.nix network.nix users.nix packages.nix
-│   ├── services/           # wakapi / sillytavern / vaultwarden / ntfy / restic / cloudflared / chive / misc
+│   ├── services/           # wakapi / sillytavern / vaultwarden / ntfy / restic / cloudflared / chive / oracle-cloud-agent / misc
 │   ├── home.nix            # ubuntu 用户的 Home Manager（含 dufs）
 │   ├── sillytavern.yaml    # SillyTavern 配置（无机密，进 git）
 │   └── chive.toml          # chive 虚拟仓配置（无机密，进 git）
@@ -287,7 +287,7 @@ asahi 保留 30 天、oci 保留 14 天），正常不需要手动跑。
 
 ## 服务出问题时会推送到手机（ntfy）
 
-`hosts/oci/services/ntfy.nix`：oci 上跑 ntfy 服务端，14 个关键单元挂了 `OnFailure=`，
+`hosts/oci/services/ntfy.nix`：oci 上跑 ntfy 服务端，15 个关键单元挂了 `OnFailure=`，
 失败时把 `systemctl status` 的尾巴推到 topic **`oci-alerts`**。
 
 订阅（手机装 ntfy app，或浏览器开 https://ntfy.xerxes2.com）：
@@ -369,6 +369,35 @@ Zen 和 Firefox 都配好了。它是 unfree 且不可再分发的，所以在 `
 
 **USB-C 外接显示器（DP alt mode）在稳定内核上没有**，要自己编 `fairydust` 分支。HDMI
 可用。
+
+**OCI 控制台的实例指标（CPU / 内存 / 磁盘 / 网络）必须靠 agent 主动上报，不装就是空的。**
+nixpkgs 没有这个包，`services/oracle-cloud-agent.nix` 从 Oracle 的 arm64 snap 里解出
+静态 Go 二进制自己封装，只启用 `gomon` 一个插件。版本是手动 pin 的，升级办法见该文件
+里的 `TODO revisit`。启动后要等约 50 秒才有第一次上报：这台机器是 IPv4 单栈，而 OCI
+SDK 每次都先撞一遍 IPv6 元数据端点（`fd00:c1::a9fe:a9fe` 返回 404）才回退，属正常。
+
+**别开 Custom Logs Monitoring 插件。** 它装的 `unified-monitoring-agent` 是 Oracle 打包的
+Fluentd：一整套 embedded Ruby + 136 个 gem、318 MB，unit 里写着 `MemoryMax=5G`。Ubuntu
+时代它在这台机器上空转吃掉几百 MB 内存（控制台侧没配日志采集，`fluentd.conf` 是 0 字节）。
+`oracle-cloud-agent.nix` 的 `agent.yml` 里根本不声明它，二进制也不进 store。
+
+**Cloud Guard Workload Protection 插件同理。** 拆开看过：snap 里的 `oci-wlp` 只是个安装
+器（带着 Oracle 的 deb GPG key，二进制里就是 `apt-get -y install` / `yum -y install`），每
+60 分钟醒一次去拉 `wlp-agent` 包，那个包内部跑 osqueryd。NixOS 上没 apt/dpkg/rpm，
+永远装不上。
+
+**插件的期望状态改不进 flake。** 它存在实例的 `agentConfig` 里，是 OCI 的资源属性，
+只能在控制台（实例 → Oracle Cloud Agent 标签页）或 API 侧改。**重装机器后记得重新把
+Custom Logs Monitoring 和 Cloud Guard Workload Protection 取消勾选**，否则那两项一直
+是 Invalid，agent 每轮健康检查都为它们白跑一次重试，还会掩盖真正的故障。当前那一
+页应该只剩 `Compute Instance Monitoring: Running`。
+
+查当前期望状态（不用开控制台）：
+
+```bash
+curl -sH 'Authorization: Bearer Oracle' http://169.254.169.254/opc/v2/instance/ \
+  | grep -E '"name"|desiredState'
+```
 
 **合盖休眠每小时掉 2-3% 电**，是 s2idle 的已知状态（AsahiLinux/linux#262），配置层面
 无解。
