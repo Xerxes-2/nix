@@ -100,8 +100,8 @@ TODO revisit: when Proton or the Steam Linux Runtime is updated.
   a 32-bit OpenGL title on stock Proton with `PROTON_LOG=1 WINEDEBUG=+wgl,+egl`
 - then: delete `compatibilitytools.d/proton9-nosrt` once a stock Proton gets a
   GL context inside pressure-vessel
-- last: 2026-08, bug still `UNCONFIRMED`, and the SLR still ships no i386 Mesa
-  overlay for FEX
+- last: 2026-09, bug still `UNCONFIRMED` (untouched upstream since 2025-10).
+  The SLR half was not re-checked - it needs the MacBook.
 
 ## Notes
 

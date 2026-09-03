@@ -66,7 +66,7 @@ in
   #          wluma takes wlr-gamma-control *exclusively* for its dim/colour
   #          temperature feature, which would fight both DMS night light and
   #          the niri software-gamma patch. Set `gamma = false` when bumping.
-  #   last:  2026-08, 4.11.1 - no [idle], no gamma, uses wlr-screencopy
+  #   last:  2026-09, 4.11.1 - unchanged: no [idle], no gamma, uses wlr-screencopy
   xdg.configFile."wluma/config.toml".source = wlumaConfig;
 
   systemd.user.services.wluma = {

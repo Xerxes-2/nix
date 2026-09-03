@@ -28,7 +28,8 @@ let
   #          看 latest/stable 的 revision 与 version
   #   then:  换下面的 revision / version / hash，rebuild 后确认日志里有
   #          "Sent metrics status: 200"
-  #   last:  2026-09，1.61.0-6（snap revision 125），上报正常
+  #   last:  2026-09，1.61.0-6（snap revision 125）仍是 latest/stable，
+  #          monitoring.log 里每分钟一条 "Sent metrics status: 200"
   version = "1.61.0-6";
   revision = "125";
 

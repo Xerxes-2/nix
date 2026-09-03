@@ -41,7 +41,8 @@ rec {
   #   check: `effectiveBarThickness` in Modules/DankBar/DankBarWindow.qml of the
   #          installed dms-shell (line 563 in 1.5.3)
   #   then:  update the formula above and the `36 +` below together
-  #   last:  2026-08, dms-shell 1.5.3 - unchanged
+  #   last:  2026-09, dms-shell 1.5.3 - unchanged (still line 563, and
+  #          Theme.barHeight is still 48)
   innerPadding = lib.max 4 (toLogical notchHeightPx - 36);
 
   barThickness = 36 + innerPadding;

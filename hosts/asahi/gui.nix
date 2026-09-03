@@ -24,6 +24,13 @@ let
   #
   # TODO revisit: drop this once Firefox's RDD sandbox learns about
   #   /dev/media*, which would make the Request API usable with the sandbox on.
+  #   check: AddV4l2Dependencies in
+  #          security/sandbox/linux/broker/SandboxBrokerPolicyFactory.cpp of
+  #          mozilla-firefox/firefox - it walks /dev itself, so a `media` match
+  #          in that file is the signal
+  #   then:  drop the MOZ_DISABLE_RDD_SANDBOX wrapper below
+  #   last:  2026-09, firefox 155 / zen 1.21.16b - the file mentions nothing but
+  #          /dev/video*, on release and on main
   #
   # The flake's own `env` option would do this, but it lives in its home-manager
   # module and hangs the var off the *unwrapped* derivation (gappsWrapperArgs
@@ -84,8 +91,8 @@ let
   #          pkgs/applications/networking/browsers/firefox/wrapper.nix), and
   #          whether widevine-cdm still installs only the Chromium layout
   #   then:  drop the prefs/GMP dir in favour of whatever option it exposes
-  #   last:  2026-08, widevine-cdm 120.0.6098.0-7a3928f - wrapper.nix has no
-  #          mention of gmp/widevine at all
+  #   last:  2026-09, widevine-cdm 120.0.6098.0-7a3928f - unchanged, and
+  #          wrapper.nix still has no mention of gmp/widevine at all
   widevineGmp = pkgs.runCommand "widevine-gmp" { } ''
     cdm=${pkgs.widevine-cdm}/share/google/chrome/WidevineCdm
     install -Dm444 "$cdm/manifest.json" $out/gmp-widevinecdm/system-installed/manifest.json
@@ -120,8 +127,8 @@ let
   #          `backgroundColor` key in the `barConfigs` defaults in
   #          Common/SettingsData.qml
   #   then:  drop this overrideAttrs and keep only the settings.json value
-  #   last:  2026-08, dms-shell 1.5.3 - no such setting, DankBarWindow.qml
-  #          still reads Theme.surfaceContainer
+  #   last:  2026-09, dms-shell 1.5.3 - no such setting, DankBarWindow.qml
+  #          still reads Theme.surfaceContainer (line 394)
   # Night light, in the renderer. See the long note next to `programs.niri`.
   niri = pkgs.niri.overrideAttrs (old: {
     patches = (old.patches or [ ]) ++ [ ./niri/software-gamma.patch ];
@@ -231,7 +238,8 @@ in
   #   then:  drop the overrideAttrs and hosts/asahi/niri/software-gamma.patch
   #   test:  nix run nixpkgs#wlsunset -- -t 2000 -T 2001 -S 23:59 -s 00:01
   #          should warm the screen within a second; Ctrl-C restores it
-  #   last:  2026-08, niri 26.04 - no upstream support, patch applies clean
+  #   last:  2026-09, niri 26.04 - no upstream support (no `software_gamma`,
+  #          tty.rs still only does DRM gamma props), patch applies clean
 
   # geoclue 2.8 moved IP geolocation into a new [ip] section with a pluggable
   # `method`, and the NixOS module still only generates the pre-2.8 sections.
@@ -248,7 +256,7 @@ in
   #   check: grep -A2 '^\[ip\]' /etc/geoclue/geoclue.conf
   #          journalctl -u geoclue | grep 'Unknown IP source'
   #   then:  delete this conf.d file once the module emits the section itself
-  #   last:  2026-08, geoclue 2.8.2 - module still emits only
+  #   last:  2026-09, geoclue 2.8.2 - module still emits only
   #          network-nmea/3g/cdma/modem-gps/wifi/static-source
   environment.etc."geoclue/conf.d/10-ip-source.conf".text = ''
     [ip]
