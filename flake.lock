@@ -3,7 +3,7 @@
     "asahi-firmware": {
       "flake": false,
       "locked": {
-        "lastModified": 1787831294,
+        "lastModified": 1788559864,
         "narHash": "sha256-M9C+tAHCVcUDwNcA+BizzHHrxxxTAG2chD5Lp1hDbYo=",
         "path": "/boot/vendorfw",
         "type": "path"
