@@ -31,8 +31,19 @@
           # --- shell / terminal ---
           carapace
           croc
-          jq
           nushell
+
+          # --- GNU 版基础工具（macOS 自带的是 BSD 版）-------------------
+          # agent 生成的脚本几乎都是 GNU 语法（`sed -i` 不带备份后缀、
+          # `grep -P`、`find -printf`、`xargs -r`…），在 BSD 版上直接报错；
+          # 而 /bin/bash 还停在 3.2（无关联数组、无 `${v,,}`）。装进
+          # /etc/profiles/per-user/xerxes2/bin 后会 shadow /usr/bin 里的同名
+          # 命令——这是有意的，交互使用上的差别可以忽略。
+          bashInteractive
+          findutils
+          gawk
+          gnugrep
+          gnused
 
           # --- dev / scm ---
           android-tools
