@@ -23,9 +23,7 @@
   services.fail2ban.enable = true;
 
   # /var/log 独立子卷但无限额，防止日志无限增长
-  services.journald.extraConfig = ''
-    SystemMaxUse=500M
-  '';
+  services.journald.settings.Journal.SystemMaxUse = "500M";
 
   # 时间线快照：误删/误改的兜底（异地备份是 restic，见 restic.nix）。
   #
