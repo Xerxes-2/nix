@@ -54,6 +54,10 @@
       # 拆两份是为了让发布方拿不到 admin 的密码哈希。两处的 tk_ 必须一致。
       "ntfy-env" = { };
       "ntfy-token" = { };
+      # ignition-env：GATEWAY_ADMIN_PASSWORD=...（演示网关的管理员口令）。
+      # 保持 root:0400 —— systemd 以自身权限读 EnvironmentFile，随后才降到
+      # User=exka，所以不需要改 owner。
+      "ignition-env" = { };
     };
   };
 

@@ -17,6 +17,7 @@
     ./services/ntfy.nix
     ./services/chive.nix
     ./services/oracle-cloud-agent.nix
+    ./services/ignition.nix
     ./services/misc.nix
   ];
 }
