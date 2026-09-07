@@ -384,8 +384,12 @@ nix shell nixpkgs#sops -c sops secrets/oci.yaml
 # 2. 放恢复用的备份。它是构建产物不是配置，所以不进这个仓库：
 #    4MB、含五个开发账号的口令哈希。
 #    在 exka_scada 里产出：./tools/make_gwbk.sh --demo
-scp dist/exka-hmi-stdlib-<sha>.gwbk oci:/tmp/
-ssh oci 'sudo install -o exka -g exka -m 0400 \
+H=OCI-Ubuntu-arm                      # ~/.ssh/config 里的别名，没有 oci 这个
+scp dist/exka-hmi-stdlib-<sha>.gwbk $H:/tmp/
+#    按数字 uid 而不是名字 exka：首次 rebuild 之前该用户还不存在。
+#    uid 3001 在 ignition.nix 里静态钉死，正是为了这一步。
+ssh $H 'sudo mkdir -p /var/lib/exka \
+        && sudo install -o 3001 -g 3001 -m 0400 \
            /tmp/exka-hmi-stdlib-*.gwbk /var/lib/exka/restore.gwbk'
 
 # 3. 应用
@@ -397,6 +401,10 @@ sudo tailscale up
 nmap -Pn -p 8088 <oci 公网 IP>        # 期望 filtered/closed
 curl -m 5 http://<tailnet 主机名>:8088/StatusPing   # 期望 {"state":"RUNNING"}
 ```
+
+文件和 rebuild 的先后无所谓：挂载源缺失时 podman 直接以
+`statfs ...: no such file or directory` 拒绝启动（不会把它建成目录），
+数据卷仍是空的，补上文件再 `systemctl restart podman-ignition` 恢复照样触发。
 
 `-r` 恢复**只在数据卷为空时触发一次**（入口脚本对已存在的实例走
 `maybe_run_upgrader`）。所以要回到出厂状态就删卷：

@@ -55,9 +55,13 @@
       "ntfy-env" = { };
       "ntfy-token" = { };
       # ignition-env：GATEWAY_ADMIN_PASSWORD=...（演示网关的管理员口令）。
-      # 保持 root:0400 —— systemd 以自身权限读 EnvironmentFile，随后才降到
-      # User=exka，所以不需要改 owner。
-      "ignition-env" = { };
+      # 归 exka，因为读它的是 podman 自己而不是 systemd：oci-containers 把
+      # environmentFiles 变成 podman 的 --env-file（模块第 482 行），进程已经是
+      # User=exka，读 root:0400 会得到
+      #   Error: parsing file "/run/secrets/ignition-env": permission denied
+      # 其它服务不需要这一行，是因为它们用 DynamicUser + EnvironmentFile，
+      # 那条路径由 systemd 以 root 读、随后才降权。
+      "ignition-env".owner = "exka";
     };
   };
 
