@@ -406,6 +406,10 @@ curl -m 5 http://<tailnet 主机名>:8088/StatusPing   # 期望 {"state":"RUNNIN
 `statfs ...: no such file or directory` 拒绝启动（不会把它建成目录），
 数据卷仍是空的，补上文件再 `systemctl restart podman-ignition` 恢复照样触发。
 
+首次启动后 `ls -l /var/lib/exka/restore.gwbk` 会显示一个陌生的数字 uid
+（不再是 `exka`）。那是 `:U` 挂载选项让 podman 把它 chown 成了容器用户，
+预期行为，不是文件坏了。
+
 `-r` 恢复**只在数据卷为空时触发一次**（入口脚本对已存在的实例走
 `maybe_run_upgrader`）。所以要回到出厂状态就删卷：
 

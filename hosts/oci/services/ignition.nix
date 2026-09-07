@@ -52,7 +52,13 @@ in
     ports = [ "${toString port}:8088" ];
     volumes = [
       "ignition-data:/usr/local/bin/ignition/data"
-      "${restore}:/restore.gwbk:ro"
+      # :U 让 podman 把挂载源 chown 成容器用户。没有它网关以
+      #   AccessDeniedException: /restore.gwbk
+      # 失败：rootless 下宿主 exka(3001) 映射成容器内 root，而网关进程是容器内
+      # ignition(2003)，读不了 0400 的 root 文件。
+      # 副作用：宿主侧属主会被改成映射后的数字 uid（不再是 exka）。ls -l 看到
+      # 陌生 uid 是预期的，不是文件坏了。
+      "${restore}:/restore.gwbk:ro,U"
     ];
     environment = {
       ACCEPT_IGNITION_EULA = "Y";
