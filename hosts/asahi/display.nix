@@ -1,8 +1,8 @@
 # Single source of truth for the built-in panel of the 14" MacBook Pro.
 #
 # Everything that has to line up with the notch is derived from the scale, so
-# changing `scaleText` below is enough: the niri output, the DMS notch spacer
-# and the DMS bar thickness all follow.
+# changing `scaleText` below is enough: the niri output, the bar's notch spacer
+# and the bar thickness all follow.
 { lib }:
 let
   # Written verbatim into niri's config.kdl, parsed for the notch math.
@@ -28,22 +28,20 @@ rec {
     notchHeightPx
     ;
 
-  # Centered DMS spacer that keeps the bar widgets out of the notch.
+  # Centered spacer that keeps the bar widgets out of the notch.
   spacerSize = toLogical notchWidthPx;
 
-  # DMS derives the bar thickness from the per-bar inner padding:
-  #   max(max(20, 26 + 0.6 * p) + p + 4, Theme.barHeight - 4 - (8 - p))
-  # With Theme.barHeight = 48 that is `36 + p` for the paddings we use, so pick
-  # the padding that makes the opaque bar cover the whole notch.
-  #
-  # TODO revisit: on every dms-shell bump - if upstream changes that formula the
-  # bar silently stops covering the notch
-  #   check: `effectiveBarThickness` in Modules/DankBar/DankBarWindow.qml of the
-  #          installed dms-shell (line 563 in 1.5.3)
-  #   then:  update the formula above and the `36 +` below together
-  #   last:  2026-09, dms-shell 1.5.3 - unchanged (still line 563, and
-  #          Theme.barHeight is still 48)
-  innerPadding = lib.max 4 (toLogical notchHeightPx - 36);
+  # Noctalia takes this verbatim as `[bar.main] thickness`, so the number the
+  # notch needs is the number in the config - there is no upstream formula left
+  # to keep in sync.
+  barThickness = toLogical notchHeightPx;
 
-  barThickness = 36 + innerPadding;
+  # DMS instead derived its bar thickness from the per-bar inner padding:
+  #   max(max(20, 26 + 0.6 * p) + p + 4, Theme.barHeight - 4 - (8 - p))
+  # which is `36 + p` for the paddings we use (Theme.barHeight = 48), hence the
+  # inverse below. Only the dms-greeter seed still reads it, and the greeter
+  # draws no bar at all (nothing under Modules/Greetd references DankBar), so
+  # this no longer has to track upstream: it goes away together with
+  # hosts/asahi/dms/ once the login screen moves to noctalia-greeter.
+  innerPadding = lib.max 4 (barThickness - 36);
 }

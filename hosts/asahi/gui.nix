@@ -118,50 +118,40 @@ let
     import ./dms/settings.nix { inherit display; }
   );
 
-  # DMS currently has no per-bar background-color setting. Add one while
-  # preserving its normal themed background as the fallback.
-  #
-  # TODO revisit: on every dms-shell bump
-  #   check: `--replace-fail` turns an upstream rename into a build error, so a
-  #          failing rebuild is the signal; for the feature itself, look for a
-  #          `backgroundColor` key in the `barConfigs` defaults in
-  #          Common/SettingsData.qml
-  #   then:  drop this overrideAttrs and keep only the settings.json value
-  #   last:  2026-09, dms-shell 1.5.3 - no such setting, DankBarWindow.qml
-  #          still reads Theme.surfaceContainer (line 394)
   # Night light, in the renderer. See the long note next to `programs.niri`.
   niri = pkgs.niri.overrideAttrs (old: {
     patches = (old.patches or [ ]) ++ [ ./niri/software-gamma.patch ];
   });
-
-  dmsShell = pkgs.dms-shell.overrideAttrs (old: {
-    postInstall = (old.postInstall or "") + ''
-      substituteInPlace $out/share/quickshell/dms/Modules/DankBar/DankBarWindow.qml \
-        --replace-fail \
-          'readonly property color _surfaceContainer: Theme.surfaceContainer' \
-          'readonly property color _surfaceContainer: barConfig?.backgroundColor ?? Theme.surfaceContainer'
-    '';
-  });
 in
 {
-  # Wayland compositor + desktop shell.
+  # Wayland compositor. The shell on top of it is noctalia, declared on the
+  # home-manager side (hosts/asahi/home.nix) because that is where its
+  # config.toml lives; that module installs the package and the user unit.
   programs.niri = {
     enable = true;
     package = niri;
   };
-  programs.dms-shell = {
-    enable = true;
-    package = dmsShell;
-  };
 
-  # Give Qt applications (including DMS/Quickshell) a real platform theme so
-  # named system-tray icons are resolved through the selected icon theme.
+  # Give Qt applications a real platform theme so they follow the selected icon
+  # theme. Noctalia is not a Qt application and resolves tray icons itself, so
+  # this now only serves the Qt apps on the system.
   qt = {
     enable = true;
     platformTheme = "qt5ct";
   };
 
-  # DMS login screen running inside niri.
+  # Login screen, still DMS. Its greeter is a separate program from the shell
+  # and draws no bar of its own (nothing under Modules/Greetd references
+  # DankBar), so it keeps working now that `programs.dms-shell` is gone -
+  # the module's `package` falls back to pkgs.dms-shell by itself.
+  #
+  # TODO revisit: move to services.displayManager.noctalia-greeter (the module
+  #   is in nixpkgs) and delete hosts/asahi/dms/ plus the seeding activation in
+  #   home.nix. Held back because that greeter brings its own bundled wlroots
+  #   compositor instead of running inside the patched niri, which is unproven
+  #   against this machine's DCP - a greeter that will not start is a machine
+  #   that will not log in.
+  #   check: boot it once from a TTY-reachable state before switching for good
   services.displayManager = {
     defaultSession = "niri";
     dms-greeter = {
@@ -179,11 +169,21 @@ in
   security.polkit.enable = true;
   xdg.mime.enable = true;
 
-  # System services the DMS widgets talk to directly.
+  # The user avatar on the lock screen and in the control centre is
+  # AccountsService's IconFile. `programs.dms-shell` used to switch the daemon
+  # on for us with mkDefault, and nothing took over: noctalia is declared
+  # through its home-manager module, which cannot enable a system service, and
+  # the NixOS `programs.noctalia` module does not enable it either. Without
+  # this the shell logs
+  #   accounts service disabled: [...ServiceUnknown] The name is not activatable
+  # at startup and shows no avatar at all.
+  services.accounts-daemon.enable = true;
+
+  # System services the bar widgets talk to directly.
   # Without UPower the battery widget/popout has no data at all.
   services.upower.enable = true;
 
-  # DMS ships its own Bluetooth UI on top of BlueZ.
+  # The shell ships its own Bluetooth UI on top of BlueZ.
   hardware.bluetooth = {
     enable = true;
     powerOnBoot = false;
@@ -191,15 +191,15 @@ in
     # Battery levels reach BlueZ through the Battery Provider D-Bus API, which
     # is gated behind the experimental flag - both the generic BAS/GATT provider
     # and the Apple vendor extension AirPods use. Without this every device
-    # simply reports no battery at all and the DMS popout has nothing to show.
+    # simply reports no battery at all and the popout has nothing to show.
     settings.General.Experimental = true;
   };
 
   # Night light needs a patched niri (the `niri` package in the let block above).
   # Apple's DCP display controller exposes only the CTM color matrix and no
   # GAMMA_LUT, while niri implements zwlr_gamma_control_v1 through GAMMA_LUT
-  # only, so the whole class of tools - DMS night mode, wlsunset, gammastep -
-  # reported success and changed nothing:
+  # only, so the whole class of tools - noctalia night light, wlsunset,
+  # gammastep - reported success and changed nothing:
   #
   #   $ wlsunset -l -37.8 -L 144.9 -t 2000
   #   gamma control of output eDP-1 (44) failed
@@ -241,39 +241,10 @@ in
   #   last:  2026-09, niri 26.04 - no upstream support (no `software_gamma`,
   #          tty.rs still only does DRM gamma props), patch applies clean
 
-  # geoclue 2.8 moved IP geolocation into a new [ip] section with a pluggable
-  # `method`, and the NixOS module still only generates the pre-2.8 sections.
-  # A source without `enable` defaults to on, so geoclue enables the IP source,
-  # reads a NULL method and immediately kills it again:
-  #
-  #   geoclue[1666]: Unknown IP source method '(null)', disabling source
-  #
-  # conf.d overrides geoclue.conf in alphabetical order, so drop the missing
-  # section in from here instead of fighting the module over geoclue.conf.
-  # `ichnaea` reuses the wifi source's beaconDB endpoint - no new third party.
-  #
-  # TODO revisit: on nixpkgs bumps that touch geoclue
-  #   check: grep -A2 '^\[ip\]' /etc/geoclue/geoclue.conf
-  #          journalctl -u geoclue | grep 'Unknown IP source'
-  #   then:  delete this conf.d file once the module emits the section itself
-  #   last:  2026-09, geoclue 2.8.2 - module still emits only
-  #          network-nmea/3g/cdma/modem-gps/wifi/static-source
-  environment.etc."geoclue/conf.d/10-ip-source.conf".text = ''
-    [ip]
-    enable=true
-    method=ichnaea
-  '';
-
-  # Location source for the weather widget and the night-mode schedule.
-  # DMS falls back to IP geolocation when GeoClue has no fix yet.
-  services.geoclue2 = {
-    enable = true;
-    appConfig.dms = {
-      isAllowed = true;
-      isSystem = true;
-      users = [ "1000" ];
-    };
-  };
+  # No geoclue any more. Noctalia resolves its own coordinates for the weather
+  # widget and the night-light schedule (`[location]` in home.nix), so both the
+  # service and the conf.d workaround for its missing [ip] section left with
+  # DMS. Nothing else on this host used it.
 
   # Where Gecko finds the CDM assembled in the let block above. Set globally
   # rather than per-wrapper because both browsers need it and, unlike
@@ -300,10 +271,6 @@ in
     firefox
     nautilus
     pavucontrol
-    # `pactl` only; DMS uses it to switch Bluetooth audio card profiles.
-    pulseaudio
-    # Optional DMS screenshot editor (`dms ipc call niri screenshot`).
-    swappy
     telegram-desktop
     vesktop # Discord client; official Discord has no aarch64-linux build.
     wl-clipboard

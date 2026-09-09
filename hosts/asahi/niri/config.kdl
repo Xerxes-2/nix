@@ -78,7 +78,7 @@ input {
 // The built-in panel. The mode is left out so niri picks the preferred
 // 3024x1964@120 (that mode includes the notch rows, see
 // `appledrm.show_notch=1`). The scale is filled in from hosts/asahi/display.nix,
-// which also derives the DMS notch spacer from it.
+// which also derives the bar's notch spacer from it.
 output "eDP-1" {
     scale @scale@
     transform "normal"
@@ -245,7 +245,7 @@ layout {
 // which may be more convenient to use.
 // See the binds section below for more spawn examples.
 
-// The bar is part of DMS (dms.service), started with the session.
+// The bar is part of noctalia (noctalia.service), started with the session.
 
 // niri has no built-in X server. xwayland-satellite provides one on demand and
 // niri exports DISPLAY for it, which X11-only clients need - Steam above all.
@@ -257,8 +257,9 @@ xwayland-satellite {
 // spawn-sh-at-startup "qs -c ~/source/qs/MyAwesomeShell"
 
 hotkey-overlay {
-    // Mod+Shift+Slash opens the DMS cheat sheet instead (see binds), so niri's
-    // own overlay is only in the way - including the one shown at startup.
+    // Mod+Shift+Slash brings this up on demand (see binds). Noctalia has no
+    // cheat sheet of its own, so niri's overlay is the only one left - but it
+    // still has no business appearing at every login.
     skip-at-startup
 }
 
@@ -311,6 +312,24 @@ window-rule {
     open-floating true
 }
 
+// Noctalia's settings window is an ordinary toplevel; float it at a size that
+// fits its layout instead of letting it take a tiling column.
+window-rule {
+    match app-id=r#"^dev\.noctalia\.Noctalia$"#
+    open-floating true
+    default-column-width { fixed 1080; }
+    default-window-height { fixed 920; }
+}
+
+// Rounded window corners. These used to arrive from dms/layout.kdl; noctalia
+// writes no niri fragment beyond colors, so they are spelled out here. The
+// focus ring follows geometry-corner-radius, and clip-to-geometry keeps the
+// window contents inside it.
+window-rule {
+    geometry-corner-radius 12
+    clip-to-geometry true
+}
+
 // Example: block out two password managers from screen capture.
 // (This example rule is commented out with a "/-" in front.)
 /-window-rule {
@@ -342,51 +361,57 @@ binds {
     // `niri msg action do-something`.
 
     // Mod-Shift-/, which is usually the same as Mod-?, shows the hotkey list.
-    // DMS renders it from this very file (`dms keybinds show niri` parses
-    // ~/.config/niri/config.kdl plus the dms/*.kdl fragments), so it stays in
-    // sync with the binds below while looking like the rest of the shell.
-    Mod+Shift+Slash hotkey-overlay-title="Show Hotkeys: DMS" { spawn "dms" "ipc" "call" "keybinds" "toggle" "niri"; }
+    // Back to niri's own overlay: noctalia has no equivalent of DMS's cheat
+    // sheet, which parsed this file to render the binds in the shell's style.
+    Mod+Shift+Slash { show-hotkey-overlay; }
 
     // Suggested binds for running programs: terminal, app launcher, screen locker.
     Mod+T hotkey-overlay-title="Open a Terminal: alacritty" { spawn "alacritty"; }
-    Mod+D hotkey-overlay-title="Run an Application: DMS" { spawn "dms" "ipc" "call" "spotlight" "toggle"; }
-    Super+Alt+L hotkey-overlay-title="Lock the Screen: DMS" { spawn "dms" "ipc" "call" "lock" "lock"; }
+    Mod+D hotkey-overlay-title="Run an Application: noctalia" { spawn "noctalia" "msg" "panel-toggle" "launcher"; }
+    Super+Alt+L hotkey-overlay-title="Lock the Screen: noctalia" { spawn "noctalia" "msg" "session" "lock"; }
+
+    // Control centre. Upstream also suggests Mod+Comma for the settings window,
+    // but that is consume-window-into-column here; settings is one click away
+    // inside the control centre, or `noctalia msg settings-toggle`.
+    Mod+S hotkey-overlay-title="Control Center: noctalia" { spawn "noctalia" "msg" "panel-toggle" "control-center"; }
 
     // Use spawn-sh to run a shell command. Do this if you need pipes, multiple commands, etc.
     // Note: the entire command goes as a single argument. It's passed verbatim to `sh -c`.
     // For example, this is a standard bind to toggle the screen reader (orca).
     Super+Alt+S allow-when-locked=true hotkey-overlay-title=null { spawn-sh "pkill orca || exec orca"; }
 
-    // Volume keys go through DMS so its on-screen display shows up.
+    // Volume keys go through noctalia so its on-screen display shows up.
     // The allow-when-locked=true property makes them work even when the session is locked.
-    // Using spawn-sh allows to pass multiple arguments together with the command.
-    // DMS clamps the volume to its own configured maximum.
-    XF86AudioRaiseVolume allow-when-locked=true { spawn "dms" "ipc" "call" "audio" "increment" "5"; }
-    XF86AudioLowerVolume allow-when-locked=true { spawn "dms" "ipc" "call" "audio" "decrement" "5"; }
-    XF86AudioMute        allow-when-locked=true { spawn "dms" "ipc" "call" "audio" "mute"; }
-    XF86AudioMicMute     allow-when-locked=true { spawn "dms" "ipc" "call" "audio" "micmute"; }
+    // noctalia clamps the volume to 100% unless [audio] enable_overdrive is on.
+    XF86AudioRaiseVolume allow-when-locked=true { spawn "noctalia" "msg" "volume-up" "5"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn "noctalia" "msg" "volume-down" "5"; }
+    XF86AudioMute        allow-when-locked=true { spawn "noctalia" "msg" "volume-mute"; }
+    XF86AudioMicMute     allow-when-locked=true { spawn "noctalia" "msg" "mic-mute"; }
 
-    // Media keys drive the MPRIS player DMS is tracking.
+    // Media keys drive the MPRIS player noctalia is tracking.
     // This will work with any MPRIS-enabled media player.
-    XF86AudioPlay        allow-when-locked=true { spawn "dms" "ipc" "call" "mpris" "playPause"; }
-    XF86AudioStop        allow-when-locked=true { spawn "dms" "ipc" "call" "mpris" "stop"; }
-    XF86AudioPrev        allow-when-locked=true { spawn "dms" "ipc" "call" "mpris" "previous"; }
-    XF86AudioNext        allow-when-locked=true { spawn "dms" "ipc" "call" "mpris" "next"; }
+    XF86AudioPlay        allow-when-locked=true { spawn "noctalia" "msg" "media" "toggle"; }
+    XF86AudioStop        allow-when-locked=true { spawn "noctalia" "msg" "media" "stop"; }
+    XF86AudioPrev        allow-when-locked=true { spawn "noctalia" "msg" "media" "previous"; }
+    XF86AudioNext        allow-when-locked=true { spawn "noctalia" "msg" "media" "next"; }
 
-    // Brightness keys go through DMS (shell OSD + logind backlight).
+    // Brightness keys go through noctalia (shell OSD + logind backlight).
     // You can use regular spawn with multiple arguments too (to avoid going through "sh"),
     // but you need to manually put each argument in separate "" quotes.
-    XF86MonBrightnessUp allow-when-locked=true { spawn "dms" "ipc" "call" "brightness" "increment" "5" ""; }
-    XF86MonBrightnessDown allow-when-locked=true { spawn "dms" "ipc" "call" "brightness" "decrement" "5" ""; }
+    // The first positional is the *target*, not the step, so "current" has to
+    // be spelled out - `brightness-up 5` would try to raise a monitor named 5.
+    XF86MonBrightnessUp allow-when-locked=true { spawn "noctalia" "msg" "brightness-up" "current" "5"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "noctalia" "msg" "brightness-down" "current" "5"; }
 
-    // Keyboard backlight. Same DMS brightness API, but addressed at the LED
-    // device (`dms ipc call brightness list`) instead of the panel backlight.
+    // Keyboard backlight has its own commands in v5 rather than being the panel
+    // backlight API addressed at an LED device, so there is no device selector
+    // to get right - they step every kbd_backlight the shell can see.
     // The 2021 MacBook Pro dropped the dedicated keys, so Mod+F5/F6 are bound
     // as well - XF86KbdBrightness* only arrives on keyboards that have them.
-    XF86KbdBrightnessUp allow-when-locked=true { spawn "dms" "ipc" "call" "brightness" "increment" "10" "leds:kbd_backlight"; }
-    XF86KbdBrightnessDown allow-when-locked=true { spawn "dms" "ipc" "call" "brightness" "decrement" "10" "leds:kbd_backlight"; }
-    Mod+F6 allow-when-locked=true hotkey-overlay-title="Keyboard Backlight Up" { spawn "dms" "ipc" "call" "brightness" "increment" "10" "leds:kbd_backlight"; }
-    Mod+F5 allow-when-locked=true hotkey-overlay-title="Keyboard Backlight Down" { spawn "dms" "ipc" "call" "brightness" "decrement" "10" "leds:kbd_backlight"; }
+    XF86KbdBrightnessUp allow-when-locked=true { spawn "noctalia" "msg" "keyboard-backlight-up"; }
+    XF86KbdBrightnessDown allow-when-locked=true { spawn "noctalia" "msg" "keyboard-backlight-down"; }
+    Mod+F6 allow-when-locked=true hotkey-overlay-title="Keyboard Backlight Up" { spawn "noctalia" "msg" "keyboard-backlight-up"; }
+    Mod+F5 allow-when-locked=true hotkey-overlay-title="Keyboard Backlight Down" { spawn "noctalia" "msg" "keyboard-backlight-down"; }
 
     // Open/close the Overview: a zoomed-out view of workspaces and windows.
     // You can also move the mouse into the top-left hot corner,
@@ -498,8 +523,8 @@ binds {
     // These binds are also affected by touchpad's natural-scroll, so these
     // example binds are "inverted", since we have natural-scroll enabled for
     // touchpads by default.
-    // Mod+TouchpadScrollDown { spawn "dms" "ipc" "call" "audio" "increment" "2"; }
-    // Mod+TouchpadScrollUp   { spawn "dms" "ipc" "call" "audio" "decrement" "2"; }
+    // Mod+TouchpadScrollDown { spawn "noctalia" "msg" "volume-up" "2"; }
+    // Mod+TouchpadScrollUp   { spawn "noctalia" "msg" "volume-down" "2"; }
 
     // You can refer to workspaces by index. However, keep in mind that
     // niri is a dynamic workspace system, so these commands are kind of
@@ -626,17 +651,20 @@ binds {
     Mod+Shift+P { power-off-monitors; }
 }
 
-// DMS-generated fragments. They come last so DMS wins over the defaults
-// above: theme-matched focus ring/border colors, the rounded window corners
-// (geometry-corner-radius + clip-to-geometry) that the focus ring follows,
-// the alt-tab switcher and the wallpaper blur backdrop.
+// Written by noctalia's built-in niri template: focus ring, border, tab
+// indicator and insert hint recoloured to the active palette. It comes last so
+// it wins over the defaults above, which is the only thing the seven dms/*.kdl
+// fragments that used to sit here still do for us - the rounded corners and
+// window rules are spelled out above now, and noctalia brings its own window
+// switcher.
 //
-// dms/outputs.kdl is deliberately NOT included: the output scale lives in
-// hosts/asahi/display.nix because the DMS notch spacer is derived from it.
-include optional=true "dms/colors.kdl"
-include optional=true "dms/layout.kdl"
-include optional=true "dms/alttab.kdl"
-include optional=true "dms/binds.kdl"
-include optional=true "dms/windowrules.kdl"
-include optional=true "dms/wpblur.kdl"
-include optional=true "dms/cursor.kdl"
+// optional=true earns its keep twice: the file does not exist until noctalia
+// has applied its templates once, and the template's apply.sh wants to append
+// this very line to config.kdl - which is a read-only home-manager symlink.
+// Having the line here already makes its grep find it and return early.
+include optional=true "noctalia.kdl"
+
+debug {
+    // Lets noctalia raise windows and act on notification actions.
+    honor-xdg-activation-with-invalid-serial
+}

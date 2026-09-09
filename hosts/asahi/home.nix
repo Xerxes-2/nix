@@ -6,12 +6,14 @@ let
     import ./dms/settings.nix { inherit display; }
   );
 
-  # DMS 的 matugen 模板只生成 dank-theme.toml（随壁纸/主题切换重写），
-  # 从不接管 alacritty.toml。所以静态配置交给 home-manager 声明式管理，
-  # 动态配色留给 DMS 在运行时写，两者互不覆盖。
+  # noctalia 的 alacritty 模板只写 themes/noctalia.toml（随壁纸/主题切换重写）。
+  # 它的 apply.sh 会想往 alacritty.toml 里补一行 import，而这个文件是 home-manager
+  # 管的只读软链 —— 写不进去就会让 post_hook 每次换主题都报错。所以这里先把同一
+  # 个路径写好：apply.sh 的 `grep -q noctalia\.toml` 命中，生成的内容和现有文件
+  # 逐字节相同，cmp 之后它什么都不写。静态配置声明式，动态配色留给 noctalia。
   # 窗口装饰不在这里关：niri 的 prefer-no-csd 已全局生效。
   alacrittyConfig = (pkgs.formats.toml { }).generate "alacritty.toml" {
-    general.import = [ "~/.config/alacritty/dank-theme.toml" ];
+    general.import = [ "~/.config/alacritty/themes/noctalia.toml" ];
   };
 in
 {
@@ -34,10 +36,10 @@ in
         programs.home-manager.enable = true;
 
         # niri's config is fully declarative: it is the upstream template with
-        # the DMS integration applied (DMS launcher, lock screen, audio,
-        # brightness and media keys go through `dms ipc`, no waybar autostart).
-        # The output scale comes from display.nix, which also sizes the DMS
-        # notch spacer.
+        # the noctalia integration applied (launcher, control center, lock,
+        # audio, brightness and media keys go through `noctalia msg`, no waybar
+        # autostart). The output scale comes from display.nix, which also sizes
+        # the bar's notch spacer.
         xdg.configFile."niri/config.kdl".source = pkgs.replaceVars ./niri/config.kdl {
           scale = display.scaleText;
           xwaylandSatellite = lib.getExe pkgs.xwayland-satellite;
@@ -45,15 +47,120 @@ in
 
         xdg.configFile."alacritty/alacritty.toml".source = alacrittyConfig;
 
-        # Seed the notch-aware DMS bar layout. This is a one-time migration:
-        # DMS owns settings.json at runtime, so later UI changes stay.
+        # 桌面 shell。声明式默认值写在 ~/.config/noctalia/config.toml（store 里的
+        # 只读软链），运行时在设置界面改的东西落到 ~/.local/state/noctalia/
+        # settings.toml，两层不互相覆盖 —— 正是下面那段 jq 播种脚本当年手搓出来
+        # 的语义。checkConfig 默认开着，build 时跑 `noctalia config validate`，
+        # 键名写错是构建失败，而不是运行时静默漂移。
+        programs.noctalia = {
+          enable = true;
+          systemd.enable = true;
+
+          settings = {
+            shell = {
+              font_family = "Inter";
+              # DMS 自带 polkit agent；换掉之后这台机器上再没有别的了。
+              polkit_agent = true;
+            };
+
+            theme = {
+              mode = "dark";
+              # 跟着壁纸生成配色，等价于原来 DMS 那套 matugen。
+              source = "wallpaper";
+
+              # bar 盖住 notch 的唯一办法。v5 的 bar 只有 background_opacity，
+              # 没有单独的背景色：底色一律取 ColorRole::Surface（bar.cpp 的
+              # applyBackgroundPalette）。pure_black_dark 把整条 surface 阶梯
+              # 下移到 surface 落在 tone 0，也就是正黑，于是不透明的 bar 和
+              # 物理 notch 连成一片。代价是所有暗色面板一起变纯黑，不只是 bar。
+              pure_black_dark = true;
+
+              # 内置模板接管原来 DMS 负责写的那几个文件：alacritty 配色、niri
+              # 的焦点环/边框颜色（取代 dms/colors.kdl）、GTK 和 Qt 调色板。
+              templates = {
+                enable_builtin_templates = true;
+                builtin_ids = [
+                  "alacritty"
+                  "niri"
+                  "gtk3"
+                  "gtk4"
+                  "qt"
+                ];
+              };
+            };
+
+            # 天气和夜灯的日出日落都从这里取坐标。auto_locate 走 IP 定位，和原来
+            # geoclue 的 [ip] 源做的是同一件事（换了个第三方：noctalia.dev）。
+            # 不想要这次查询就删掉它，改写死 latitude/longitude。
+            location.auto_locate = true;
+
+            # 夜灯仍然走 wlr-gamma-control，所以前提照旧是 gui.nix 里那个打了
+            # software-gamma 补丁的 niri。
+            nightlight = {
+              enabled = true;
+              temperature_night = 4000;
+            };
+
+            # notch 那条 bar：不透明、无圆角、贴边、厚度正好盖住 notch，中间用
+            # 一个定长 spacer 把 widget 从 notch 底下推开。thickness 和 length
+            # 都是屏幕像素，直接来自 display.nix，没有要跟上游对齐的公式。
+            bar.main = {
+              position = "top";
+              thickness = display.barThickness;
+              background_opacity = 1.0;
+              radius = 0;
+              margin_ends = 0;
+              margin_edge = 0;
+              shadow = false;
+              reserve_space = true;
+
+              start = [
+                "launcher"
+                "workspaces"
+                "active_window"
+                "media"
+              ];
+              center = [ "notch" ];
+              end = [
+                "clock"
+                "tray"
+                "clipboard"
+                "cpu"
+                "ram"
+                "notifications"
+                "battery"
+                "control-center"
+              ];
+            };
+
+            # 名字等于类型的 widget 会自动实例化，其余的在这里定义。sysmon 一个
+            # 实例只显示一项，所以 DMS 的 cpuUsage + memUsage 在这里是两个。
+            widget = {
+              notch = {
+                type = "spacer";
+                length = display.spacerSize;
+              };
+              cpu = {
+                type = "sysmon";
+                stat = "cpu_usage";
+              };
+              ram = {
+                type = "sysmon";
+                stat = "ram_pct";
+              };
+            };
+          };
+        };
+
+        # 现在只剩 dms-greeter 在读这个文件：shell 已经换成 noctalia，而登录界面
+        # 自己不画 bar，所以这里播的 bar 布局其实已经没人看，留着是因为 greeter
+        # 还要从同一个 settings.json 取主题和图标主题。
         #
-        # TODO revisit: 改布局或 DMS 换 config 版本时 —— 有 marker 的机器上这段
-        # 是空转的
+        # TODO revisit: 等 gui.nix 里的 greeter 换成 noctalia-greeter
         #   check: ls ~/.local/state/DankMaterialShell/.notch-layout-v4
-        #   then:  要重新播种就把 marker 改成 -v5；等所有机器都迁完之后，可以只
-        #          留 else 分支（全新安装用）并删掉 jq 合并那一半
-        #   last:  2026-08，asahi 上已应用
+        #   then:  整段连同 hosts/asahi/dms/ 和 display.nix 里的 innerPadding
+        #          一起删掉
+        #   last:  2026-08，asahi 上已应用（marker 在，所以这段现在是空转的）
         home.activation.dmsNotchLayout = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           settings="$HOME/.config/DankMaterialShell/settings.json"
           marker="$HOME/.local/state/DankMaterialShell/.notch-layout-v4"
