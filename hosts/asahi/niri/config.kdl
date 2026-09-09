@@ -628,6 +628,30 @@ binds {
     // Mod+Space       { switch-layout "next"; }
     // Mod+Shift+Space { switch-layout "prev"; }
 
+    // 截图键位对齐 macOS：Apple 键盘的 Command 在 Linux 下映射成 Super，也
+    // 就是这里的 Mod，所以下面几组按下去的手势和 macOS 的 Cmd+Shift+3/4/5
+    // 完全一样。数字写 3/4/5 而不是 Shift 之后的 numbersign/dollar/percent
+    // ——niri 按未加 Shift 的 keysym 匹配，和上面的 Mod+Shift+Slash 同理。
+    //
+    // 统一带 show-pointer=false：macOS 的截图默认不含鼠标指针，而 niri 的
+    // screenshot / screenshot-screen 默认含。交互式 UI 里按 P 仍能加回来。
+    //
+    // Cmd+Shift+3：整屏，落盘 + 进剪贴板。
+    Mod+Shift+3 { screenshot-screen show-pointer=false; }
+    // Cmd+Shift+4：交互式框选，拉完按空格保存、Esc 取消。
+    Mod+Shift+4 { screenshot show-pointer=false; }
+    // macOS 上 Cmd+Shift+4 再按空格是截窗口，但 niri 的截图 UI 没有选窗口
+    // 模式，只能另给一个键；Cmd+Shift+5 在 macOS 上是截图工具面板，niri 没
+    // 有对应物，正好空出来接窗口截图。
+    Mod+Shift+5 { screenshot-window; }
+
+    // macOS 里加 Ctrl 表示「只进剪贴板、不落盘」。niri 的截图本来就一律进
+    // 剪贴板，write-to-disk=false 只是不再写文件。交互式 screenshot 不收这
+    // 个属性，它的等价操作是在 UI 里按 Ctrl+C。
+    Mod+Ctrl+Shift+3 { screenshot-screen show-pointer=false write-to-disk=false; }
+    Mod+Ctrl+Shift+5 { screenshot-window write-to-disk=false; }
+
+    // 外接键盘上的 Print 保留 niri 上游默认行为——MacBook 内置键盘没有这个键。
     Print { screenshot; }
     Ctrl+Print { screenshot-screen; }
     Alt+Print { screenshot-window; }
