@@ -308,6 +308,12 @@ in
     pavucontrol
     telegram-desktop
     vesktop # Discord client; official Discord has no aarch64-linux build.
+    # Wayland application forwarding over ssh - one binary that is both ends,
+    # `waypipe ssh <host> <app>` wraps the ssh call and starts the far side
+    # itself. The macOS counterpart is the waypipe-darwin brew (plus cocoa-way
+    # for a compositor) in hosts/darwin/configuration.nix. This host runs no
+    # sshd, so nothing can be forwarded *out* of it; this end is the client.
+    waypipe
     wl-clipboard
     xdg-utils
     zen-browser
