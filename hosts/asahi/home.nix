@@ -1,10 +1,6 @@
 { lib, pkgs, ... }:
 let
-  display = import ./display.nix { inherit lib; };
-
-  dmsSettings = (pkgs.formats.json { }).generate "settings.json" (
-    import ./dms/settings.nix { inherit display; }
-  );
+  display = import ./display.nix { };
 
   # noctalia 的 alacritty 模板只写 themes/noctalia.toml（随壁纸/主题切换重写）。
   # 它的 apply.sh 会想往 alacritty.toml 里补一行 import，而这个文件是 home-manager
@@ -49,8 +45,9 @@ in
 
         # 桌面 shell。声明式默认值写在 ~/.config/noctalia/config.toml（store 里的
         # 只读软链），运行时在设置界面改的东西落到 ~/.local/state/noctalia/
-        # settings.toml，两层不互相覆盖 —— 正是下面那段 jq 播种脚本当年手搓出来
-        # 的语义。checkConfig 默认开着，build 时跑 `noctalia config validate`，
+        # settings.toml，两层不互相覆盖 —— 正是原来那段 jq + marker 播种脚本手搓
+        # 出来的语义（已随 DMS 一起删掉）。checkConfig 默认开着，build 时会跑
+        # `noctalia config validate`，
         # 键名写错是构建失败，而不是运行时静默漂移。
         programs.noctalia = {
           enable = true;
@@ -152,61 +149,21 @@ in
           };
         };
 
-        # 现在只剩 dms-greeter 在读这个文件：shell 已经换成 noctalia，而登录界面
-        # 自己不画 bar，所以这里播的 bar 布局其实已经没人看，留着是因为 greeter
-        # 还要从同一个 settings.json 取主题和图标主题。
+        # 图标主题的一次性引导。这段原本还负责给 DMS 播种 settings.json，那半边
+        # 随 dms-greeter 一起删了。剩下的 GTK / Qt 两个循环没有替代品：noctalia
+        # 的 gtk / qt 模板只写配色（gtk.css、qt5ct/colors/noctalia.conf），从不
+        # 碰图标主题。marker 换了路径，所以这台机器上会再幂等地跑一次。
         #
-        # TODO revisit: 等 gui.nix 里的 greeter 换成 noctalia-greeter
-        #   check: ls ~/.local/state/DankMaterialShell/.notch-layout-v4
-        #   then:  整段连同 hosts/asahi/dms/ 和 display.nix 里的 innerPadding
-        #          一起删掉
-        #   last:  2026-08，asahi 上已应用（marker 在，所以这段现在是空转的）
-        home.activation.dmsNotchLayout = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-          settings="$HOME/.config/DankMaterialShell/settings.json"
-          marker="$HOME/.local/state/DankMaterialShell/.notch-layout-v4"
+        # TODO revisit: 想换成 home-manager 的 gtk 模块接管 settings.ini 时
+        #   check: 它是否也会声明式接管 gtk.css —— 那正是 noctalia 的 gtk
+        #          apply.sh 要写的文件，一旦变成只读软链，每次换主题都会失败
+        #   then:  GTK 那半边换成 gtk.iconTheme，Qt 那半边照旧
+        home.activation.iconTheme = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+          marker="$HOME/.local/state/nixcfg/.icon-theme-adwaita"
 
           if [ ! -e "$marker" ]; then
-            mkdir -p "$(dirname "$settings")" "$(dirname "$marker")"
-            if [ -s "$settings" ] && ${pkgs.jq}/bin/jq -e '.barConfigs | type == "array" and length > 0' "$settings" >/dev/null; then
-              tmp="$(mktemp)"
-              ${pkgs.jq}/bin/jq '
-                .iconThemeDark = "Adwaita"
-                | .iconThemeLight = "Adwaita"
-                | .barConfigs[0].position = 0
-                | .barConfigs[0].spacing = 0
-                | .barConfigs[0].innerPadding = ${toString display.innerPadding}
-                | .barConfigs[0].bottomGap = 0
-                | .barConfigs[0].transparency = 1.0
-                | .barConfigs[0].backgroundColor = "#000000"
-                | .barConfigs[0].squareCorners = true
-                | .barConfigs[0].leftWidgets = [
-                    "launcherButton",
-                    "workspaceSwitcher",
-                    "focusedWindow",
-                    "music"
-                  ]
-                | .barConfigs[0].centerWidgets = [
-                    { "id": "spacer", "size": ${toString display.spacerSize} }
-                  ]
-                | .barConfigs[0].rightWidgets = [
-                    "clock",
-                    "systemTray",
-                    "clipboard",
-                    "cpuUsage",
-                    "memUsage",
-                    "notificationButton",
-                    "battery",
-                    "controlCenterButton"
-                  ]
-              ' "$settings" > "$tmp"
-              install -m 0600 "$tmp" "$settings"
-              rm -f "$tmp"
-            else
-              install -m 0600 ${dmsSettings} "$settings"
-            fi
+            mkdir -p "$(dirname "$marker")"
 
-            # DMS only applies these files when the theme is changed through
-            # its UI, so initialize them explicitly for the first migration.
             for toolkit in gtk-3.0 gtk-4.0; do
               config_dir="$HOME/.config/$toolkit"
               config_file="$config_dir/settings.ini"

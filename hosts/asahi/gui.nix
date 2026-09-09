@@ -5,7 +5,7 @@
   ...
 }:
 let
-  display = import ./display.nix { inherit lib; };
+  display = import ./display.nix { };
 
   # Hardware video decoding through AVD (see avd.nix) reaches the decoder over
   # the V4L2 Stateless / Request API, which needs both /dev/video* and
@@ -114,10 +114,6 @@ let
   # everything else this package does stay untouched.
   firefox = pkgs.firefox.override { extraPrefsFiles = [ widevinePrefs ]; };
 
-  dmsSettings = (pkgs.formats.json { }).generate "settings.json" (
-    import ./dms/settings.nix { inherit display; }
-  );
-
   # Night light, in the renderer. See the long note next to `programs.niri`.
   niri = pkgs.niri.overrideAttrs (old: {
     patches = (old.patches or [ ]) ++ [ ./niri/software-gamma.patch ];
@@ -140,27 +136,66 @@ in
     platformTheme = "qt5ct";
   };
 
-  # Login screen, still DMS. Its greeter is a separate program from the shell
-  # and draws no bar of its own (nothing under Modules/Greetd references
-  # DankBar), so it keeps working now that `programs.dms-shell` is gone -
-  # the module's `package` falls back to pkgs.dms-shell by itself.
+  # Login screen. Unlike dms-greeter, which ran inside a second copy of the
+  # session's compositor, this one brings its own bundled wlroots. That is the
+  # one place on this machine where the software-gamma patch below does not
+  # apply, so night light does not reach the login screen - no loss there, but
+  # it also means the greeter is the part most likely to break on a wlroots or
+  # DCP change, and a greeter that will not start is a machine that will not
+  # log in. `systemctl status greetd` and Ctrl+Alt+F2 are the way back.
   #
-  # TODO revisit: move to services.displayManager.noctalia-greeter (the module
-  #   is in nixpkgs) and delete hosts/asahi/dms/ plus the seeding activation in
-  #   home.nix. Held back because that greeter brings its own bundled wlroots
-  #   compositor instead of running inside the patched niri, which is unproven
-  #   against this machine's DCP - a greeter that will not start is a machine
-  #   that will not log in.
-  #   check: boot it once from a TTY-reachable state before switching for good
-  services.displayManager = {
-    defaultSession = "niri";
-    dms-greeter = {
-      enable = true;
-      compositor.name = "niri";
-      configHome = "/home/xerxes2";
-      configFiles = [ dmsSettings ];
+  # `services.displayManager.defaultSession` is deliberately gone: greetd runs
+  # the greeter, and the greeter's own `session.default` picks what to launch,
+  # so there is one place that decides instead of two.
+  services.displayManager.noctalia-greeter = {
+    enable = true;
+
+    cursorTheme = {
+      package = pkgs.adwaita-icon-theme;
+      name = "Adwaita";
+    };
+
+    settings = {
+      # `noctalia-greeter sessions` prints the picker label, which is the
+      # desktop entry's Name= - "Niri", not the niri.desktop id.
+      session.default = "Niri";
+      # Skips the user list and opens straight on the password prompt.
+      user.default = "xerxes2";
+
+      appearance = {
+        # Palette and wallpaper come from the desktop, pushed over by
+        # `noctalia msg greeter-sync`. Until that has run once the greeter
+        # falls back to its own default look; it is not automatic, so re-run it
+        # after changing the wallpaper if you want the two to match.
+        scheme = "Synced";
+        theme_mode = "dark";
+        font_family = "Inter";
+      };
+
+      # Left alone, the greeter's compositor derives a scale from the panel
+      # geometry, which is not necessarily the session's. Pin it to the same
+      # source of truth the niri output uses so login and desktop are one size.
+      output.scale = display.scale;
     };
   };
+
+  # Two warnings the greeter logs on every start are expected here and not
+  # worth chasing:
+  #
+  #   [WRN] [greeter-config] failed to open '/var/lib/noctalia-greeter/greeter.toml' for write
+  #   [WRN] [greeter-config] migrated sync.toml but failed to strip runtime keys from [...]
+  #
+  # It wants to write back the last-used session and user, but the module
+  # symlinks greeter.toml into the store (`L+` tmpfiles rule), so the file is
+  # read-only by construction. The nixpkgs module documents this as an upstream
+  # limitation - state is due to move to its own file. Nothing is lost while
+  # `session.default` and `user.default` above pin exactly the state it wanted
+  # to persist.
+  #
+  # TODO revisit: on noctalia-greeter bumps
+  #   check: journalctl -b -u greetd | grep greeter-config
+  #   then:  drop this note once upstream stops writing to greeter.toml
+  #   last:  2026-09, noctalia-greeter 1.3.1 - still warns on every start
 
   # Desktop plumbing.
   services.dbus.enable = true;

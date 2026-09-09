@@ -38,13 +38,12 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 │   ├── filesystems.nix     # btrfs 压缩/挂载选项，叠加在上面那份之上
 │   ├── power.nix           # zswap / 电池上限 / 电源键 / systemd-oomd
 │   ├── dualboot.nix        # 切回 macOS、同步 macOS 的蓝牙/Wi-Fi 凭据
-│   ├── gui.nix             # niri + DMS + 音频 + 字体 + Widevine
+│   ├── gui.nix             # niri + noctalia-greeter + 音频 + 字体 + Widevine
 │   ├── display.nix         # 内屏刘海几何的唯一真相，缩放改这里
 │   ├── input.nix           # fcitx5 双拼
 │   ├── containers.nix      # podman / distrobox
 │   ├── niri/               # config.kdl + 软件夜间模式补丁（见 gui.nix 的注释）
-│   ├── dms/settings.nix    # DMS 首次启动的初始布局
-│   ├── home.nix            # xerxes2 用户的 Home Manager
+│   ├── home.nix            # xerxes2 用户的 Home Manager，含 noctalia 的 config.toml
 │   └── steam/              # Fedora Asahi 游戏栈容器（FEX + muvm），见其 README
 ├── hosts/darwin/
 │   ├── configuration.nix   # nix-darwin 入口：GUI 应用、字体、homebrew、defaults
@@ -504,7 +503,7 @@ Git`）。跑一条 `jj st` 即可，原理见 `AGENTS.md`。
 rg -n --glob '!flake.lock' 'TODO revisit' /etc/nixos
 ```
 
-升级 `nixpkgs` / 内核 / dms-shell 之后按这份清单走一遍，能删的就删掉，删不掉的把
+升级 `nixpkgs` / 内核 / noctalia 之后按这份清单走一遍，能删的就删掉，删不掉的把
 `last:` 那行的日期和结论更新掉。
 
 ## 迁移历史
