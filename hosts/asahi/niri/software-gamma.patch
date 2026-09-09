@@ -1,4 +1,4 @@
-From 81dd9e4075a7a8e2afe4db4ec0ab449ba2809202 Mon Sep 17 00:00:00 2001
+From 59709d3be8e67573c4a7b6a216149030200308bd Mon Sep 17 00:00:00 2001
 From: niri patch <niri@local>
 Date: Fri, 28 Aug 2026 15:11:28 +1000
 Subject: [PATCH] render: apply gamma ramps in software when there's no
@@ -33,6 +33,17 @@ anything below it changes. For a point-wise transform that would turn every
 one pixel of damage into a full output recomposite - measured at +0.5 W on
 a 3024x1964 panel with a 20 Hz clock as the only damage source.
 
+An offscreen render of RenderTarget::Output that gets composited back onto
+the same output must leave the ramp out, or it is applied twice: once in
+the texture and once by the live element drawn over it. Two places do this,
+capture_screenshots() and do_screen_transition(), and they now go through
+render_to_vec_for_recomposite(). This is not only about what is shown -
+ScreenshotUi::capture() writes out the RenderTarget::Output variant, so
+without it every interactive screenshot taken under night light is saved
+with the tint baked in, while screenshot-screen and screenshot-window,
+which render RenderTarget::ScreenCapture, are unaffected. A hardware LUT
+would not show up in any of them, since it is applied at scanout.
+
 What is still lost while a ramp is set is direct scanout, since the frame
 has to go through the renderer. An identity ramp is treated as no ramp at
 all, which is what clients leave behind when night light is scheduled but
@@ -44,12 +55,12 @@ when the hardware has a LUT, for testing.
 ---
  niri-config/src/debug.rs                  |   4 +
  src/handlers/mod.rs                       |  48 ++-
- src/niri.rs                               |  34 +-
+ src/niri.rs                               |  58 ++-
  src/render_helpers/mod.rs                 |   1 +
  src/render_helpers/shaders/gamma_lut.frag |  55 +++
  src/render_helpers/shaders/mod.rs         |  15 +
  src/render_helpers/software_gamma.rs      | 449 ++++++++++++++++++++++
- 7 files changed, 594 insertions(+), 12 deletions(-)
+ 7 files changed, 616 insertions(+), 14 deletions(-)
  create mode 100644 src/render_helpers/shaders/gamma_lut.frag
  create mode 100644 src/render_helpers/software_gamma.rs
 
@@ -167,7 +178,7 @@ index 3532078..0e5e10d 100644
  
  struct UrgentOnlyMarker;
 diff --git a/src/niri.rs b/src/niri.rs
-index ec40e01..414d26e 100644
+index ec40e01..cd568c7 100644
 --- a/src/niri.rs
 +++ b/src/niri.rs
 @@ -155,6 +155,7 @@ use crate::render_helpers::blur::BlurOptions;
@@ -231,7 +242,34 @@ index ec40e01..414d26e 100644
      /// Schedules an immediate redraw if one is not already scheduled.
      pub fn queue_redraw(&mut self, output: &Output) {
          let state = self.output_state.get_mut(output).unwrap();
-@@ -4213,6 +4233,15 @@ impl Niri {
+@@ -4159,6 +4179,26 @@ impl Niri {
+         elements
+     }
+ 
++    /// Renders an output into a `Vec` for a texture that will itself be composited back onto
++    /// that same output later: the screenshot UI's frozen frames, the screen transition's
++    /// outgoing frame.
++    ///
++    /// Same as `render_to_vec()` minus the software gamma ramp. That ramp stands in for a
++    /// hardware LUT, which is applied at scanout and so never lands in a capture, and it is
++    /// drawn again over the live output when the resulting texture is shown. Leaving it in
++    /// would therefore tint such a texture twice on screen - and, since
++    /// `ScreenshotUi::capture()` writes out the `RenderTarget::Output` variant, would also save
++    /// a tinted PNG from every interactive screenshot taken under night light.
++    fn render_to_vec_for_recomposite<R: NiriRenderer>(
++        &self,
++        ctx: RenderCtx<R>,
++        output: &Output,
++    ) -> Vec<OutputRenderElements<R>> {
++        let mut elements = self.render_to_vec(ctx, output, false);
++        elements.retain(|elem| !matches!(elem, OutputRenderElements::SoftwareGamma(_)));
++        elements
++    }
++
+     pub fn render<R: NiriRenderer>(
+         &self,
+         mut ctx: RenderCtx<R>,
+@@ -4213,6 +4253,15 @@ impl Niri {
              self.render_pointer(ctx.renderer, output, &mut |elem| push(elem.into()));
          }
  
@@ -247,7 +285,25 @@ index ec40e01..414d26e 100644
          // Next, the screen transition texture.
          {
              if let Some(transition) = &state.screen_transition {
-@@ -6523,6 +6552,7 @@ niri_render_elements! {
+@@ -5475,7 +5524,7 @@ impl Niri {
+                     target,
+                     xray: None,
+                 };
+-                let elements = self.render_to_vec(ctx, &output, false);
++                let elements = self.render_to_vec_for_recomposite(ctx, &output);
+                 let elements = elements.iter().rev();
+ 
+                 let res = render_to_texture(
+@@ -6256,7 +6305,7 @@ impl Niri {
+                         target,
+                         xray: None,
+                     };
+-                    let elements = self.render_to_vec(ctx, &output, false);
++                    let elements = self.render_to_vec_for_recomposite(ctx, &output);
+                     let elements = elements.iter().rev();
+ 
+                     let res = render_to_texture(
+@@ -6523,6 +6572,7 @@ niri_render_elements! {
          ScreenshotUi = ScreenshotUiRenderElement,
          WindowMruUi = WindowMruUiRenderElement<R>,
          ExitConfirmDialog = ExitConfirmDialogRenderElement,
@@ -823,6 +879,3 @@ index 0000000..e2848cf
 +        Ok(())
 +    }
 +}
--- 
-2.55.0
-
