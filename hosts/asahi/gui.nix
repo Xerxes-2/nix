@@ -314,6 +314,12 @@ in
     # for a compositor) in hosts/darwin/configuration.nix. This host runs no
     # sshd, so nothing can be forwarded *out* of it; this end is the client.
     waypipe
+    # Tencent's official Linux build, repackaged from their AppImage. Three
+    # libraries under RadiumWMPF/runtime are 4K-page aligned and so cannot be
+    # loaded by this host's 16K-page kernel (ARM64_16K_PAGES is a hard
+    # requirement of the GPU driver): messaging works, mini-programs and
+    # audio/video calls do not.
+    wechat
     wl-clipboard
     xdg-utils
     zen-browser
