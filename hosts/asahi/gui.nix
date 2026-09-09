@@ -114,6 +114,35 @@ let
   # everything else this package does stay untouched.
   firefox = pkgs.firefox.override { extraPrefsFiles = [ widevinePrefs ]; };
 
+  # WeChat statically links Qt5 together with fcitx-qt5's platform input
+  # context - the binary still carries the
+  # third_party/fcitx-qt5/qt5/platforminputcontext/*.cpp source paths and the
+  # org.fcitx.Fcitx.InputMethod1 / InputContext1 DBus interface names - and so
+  # reaches fcitx5 over DBus rather than through any module we ship. But it
+  # only reads the *singular* QT_IM_MODULE: that string is in the binary, the
+  # Qt 6.8+ plural QT_IM_MODULES is not. hosts/asahi/input.nix sets only the
+  # plural, and deliberately leaves the singular unset because
+  # fcitx5.waylandFrontend is on, so the input context plugin never loads and
+  # nothing can be typed into WeChat in Chinese.
+  #
+  # There is no Wayland path to fall back to: it links libX11/libxcb and the
+  # statically linked Qt carries only QXcbIntegration, so it is an XWayland
+  # client and this DBus route is the only one it has.
+  #
+  # Wrapped rather than set in environment.sessionVariables: the singular
+  # variable would pull every *other* Qt app off the native Wayland
+  # text-input protocol and onto the fcitx module, which is exactly what
+  # waylandFrontend is there to avoid. The desktop entry is `Exec=wechat`
+  # without a path, so PATH resolution reaches this wrapper too.
+  wechat = pkgs.symlinkJoin {
+    name = "wechat-wrapped";
+    paths = [ pkgs.wechat ];
+    nativeBuildInputs = [ pkgs.makeWrapper ];
+    postBuild = ''
+      wrapProgram $out/bin/wechat --set QT_IM_MODULE fcitx
+    '';
+  };
+
   # Night light, in the renderer. See the long note next to `programs.niri`.
   niri = pkgs.niri.overrideAttrs (old: {
     patches = (old.patches or [ ]) ++ [ ./niri/software-gamma.patch ];
