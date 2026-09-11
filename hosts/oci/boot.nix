@@ -29,11 +29,22 @@
   # 最新主线内核（启动失败可在 GRUB 选上一代回滚）
   boot.kernelPackages = pkgs.linuxPackages_latest;
 
-  # 保留 OCI 串口控制台（救援通道）
+  # 保留 OCI 串口控制台（救援通道）。波特率显式写死 115200：不写就沿用固件
+  # 设定，而固件改了我们不会知道；上游 nixos/modules/virtualisation/oci-common.nix
+  # 也是这个值（抄自 OCI 上 Ubuntu 的 /proc/cmdline）。
   boot.kernelParams = [
-    "console=tty1"
-    "console=ttyAMA0"
+    "console=tty1" # VNC 控制台
+    "console=ttyAMA0,115200"
   ];
+
+  # 引导卷在 OCI 控制台扩容后，自动把根分区推到盘尾（配合 filesystems.nix 里
+  # 根文件系统的 autoResize，一次重启就吃满新容量，不用手工 growpart + btrfs
+  # resize）。抄自 nixos/modules/virtualisation/oci-common.nix。
+  #
+  # 之所以在这台机器上成立：分区是 Ubuntu cloud image 的排法，根分区编号虽是 1，
+  # 物理位置却在最后（sda15 ESP @2048、sda16 /boot @206848、sda1 根 @2099200），
+  # 后面没有别的分区挡路。换盘或重排分区表前先确认这一点仍然为真。
+  boot.growPartition = true;
 
   # BBR 拥塞控制：海外 VPS 对外提供服务，吞吐/延迟收益明显
   boot.kernelModules = [ "tcp_bbr" ];

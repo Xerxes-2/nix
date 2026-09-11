@@ -99,6 +99,23 @@ darwin 也在用的 `modules/home/cli.nix`。
 
 `btdu` 还要求路径挂在 `subvolid=5`（顶层子卷）上，直接对 `/` 跑会被拒。
 
+### 引导卷扩容
+
+在 OCI 控制台把引导卷调大之后，只需重启一次，剩下的全自动：`boot.growPartition`
+（`hosts/oci/boot.nix`）跑 `growpart /dev/sda 1` 把根分区推到盘尾，`/` 上的
+`autoResize`（`hosts/oci/filesystems.nix`）挂的 `x-systemd.growfs` 再把 btrfs 撑满。
+不用手工 `growpart` + `btrfs filesystem resize max`。两处都抄自上游
+`nixos/modules/virtualisation/oci-common.nix`。
+
+能这么省事是因为根分区 `sda1` 物理上就在盘尾（`sda15` ESP、`sda16` `/boot` 排在它
+前面，这是 Ubuntu cloud image 的布局）。核对办法：
+
+```bash
+for p in /sys/block/sda/sda*; do echo "$p start=$(cat $p/start) size=$(cat $p/size)"; done
+```
+
+根分区的 `start` 必须是最大的那个；不是的话 growpart 扩不了，得先搬分区。
+
 ### 再改布局的话
 
 改布局要搬数据，不是改个 `.nix` 就完事。oci 那次（`@` → 拆出 `@nix` + `@varlib`）

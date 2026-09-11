@@ -39,6 +39,12 @@ in
     device = "/dev/disk/by-uuid/${btrfsUuid}";
     fsType = "btrfs";
     options = btrfsOpts "/@";
+    # 引导卷扩容后自动把 btrfs 撑满（分区那一半由 boot.growPartition 做，见
+    # boot.nix）。只在 "/" 上标一次就够：下面那六个挂的是同一个 btrfs，
+    # 文件系统级的 resize 是全局的，重复标只会多跑几个 systemd-growfs 单元。
+    # 实现是挂载选项 x-systemd.growfs（nixos/modules/tasks/filesystems.nix），
+    # btrfs 在 resizableFSes 名单里。
+    autoResize = true;
   };
   fileSystems."/nix" = {
     device = "/dev/disk/by-uuid/${btrfsUuid}";
