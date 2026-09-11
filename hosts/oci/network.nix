@@ -7,8 +7,7 @@
 }:
 {
   networking.hostName = "instance-20260821-1942";
-  networking.useNetworkd = true;
-  networking.useDHCP = true; # OCI DHCP 下发 IP/路由/MTU
+  # useNetworkd / useDHCP 在 modules/oci-guest.nix（OCI 的 DHCP 下发 IP/路由/MTU）
   networking.firewall.enable = true;
   networking.firewall.allowedTCPPorts = [ 22 ]; # 其余服务走 cloudflared 隧道
 

@@ -277,7 +277,7 @@ sudo nixos-rebuild switch --rollback    # 回到上一代系统配置
 能回滚的代数就这么多，更早的已经从启动菜单里清掉了。
 
 oci 上系统起不来时走 OCI 控制台的**串口控制台**，GRUB 菜单会出现在那里（保留 4 代，
-`boot.loader.grub.configurationLimit = 4`）。这一点是靠 `hosts/oci/boot.nix` 里的
+`boot.loader.grub.configurationLimit = 4`）。这一点是靠 `modules/oci-guest.nix` 里的
 `font = null`（连带 `splashImage = null`）换来的：NixOS 默认配了字体，grub.cfg 里就会有
 `terminal_output gfxterm`，菜单只画在 VNC 那块虚拟显示器上，串口全程一片空白。
 

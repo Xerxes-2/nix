@@ -69,11 +69,9 @@
     fileSystems = [ "/" ];
   };
 
-  # OCI VCN 内部 NTP，低延迟且必达
-  services.chrony = {
-    enable = true;
-    servers = [ "169.254.169.254" ];
-  };
+  # 时间同步（服务器上证书/TOTP/日志都依赖它）。
+  # 指向 OCI VCN 内部 NTP 的那行在 modules/oci-guest.nix。
+  services.chrony.enable = true;
 
   # mosh（模块会自动放行 UDP 60000-61000）
   programs.mosh.enable = true;
