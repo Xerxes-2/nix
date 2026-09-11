@@ -16,7 +16,28 @@
     # EFI/BOOT/BOOTAA64.EFI，不依赖 NVRAM
     efiInstallAsRemovable = true;
     configurationLimit = 4;
+
+    # 关掉 gfxterm，否则串口上根本看不到引导菜单。NixOS 默认给 GRUB 配字体，
+    # install-grub.pl 就会往 grub.cfg 里写 `terminal_output gfxterm`（纯图形终端，
+    # 走 GOP），于是菜单只存在于 VNC 那块虚拟显示器上——救援时想在串口里选上一代
+    # 根本选不着。置 null 后 grub.cfg 不再动 terminal_output，沿用 EFI 默认的 `console`
+    # （固件 SimpleTextOut/In）。
+    #
+    # 为什么这样就够：本机 ConOut / ConIn 两个 EFI 变量里各有两条设备路径实例，
+    # 第二条就是 UART（节点类型 03 0e），对应 SPCR 里的 pl011,mmio,0x9000000。
+    # 所以菜单输出和按键输入会同时走 VNC 和串口。不重启就能核对：
+    #   od -An -tx1 /sys/firmware/efi/efivars/ConOut-8be4df61-93ca-11d2-aa0d-00e098032b8c
+    #
+    # 上游 nixos/modules/virtualisation/oci-common.nix 的 `serial --unit=0` +
+    # `terminal_* --append serial` 故意不抄：那是 x86 写法。arm64-efi 的 grub 串口名是
+    # efi0（grub-core/term/efi/serial.c 用 "efi%d" 注册，走 EFI_SERIAL_IO_PROTOCOL），
+    # 而 --unit=0 拼出的是 com0（grub-core/term/serial.c），只会得到
+    # "serial port `com0' isn't found"；就算改成 efi0 也是把同一个 pl011 再驱一遍，
+    # 跟 ConOut 里那条重复输出。
+    font = null;
+    splashImage = null; # 背景图靠 gfxterm 才能画，上面关了它就没意义了
   };
+
   boot.loader.efi = {
     canTouchEfiVariables = false;
     efiSysMountPoint = "/boot/efi";
