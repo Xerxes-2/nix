@@ -10,7 +10,6 @@
     ./gui.nix
     ./input.nix
     ./containers.nix
-    ./avd.nix
     ./power.nix
     ./network.nix
     ./dualboot.nix
@@ -55,7 +54,21 @@
     enable = true;
     setupAsahiSound = true;
     peripheralFirmwareDirectory = inputs.asahi-firmware;
+
+    # AVD is a stateless decoder, so it only speaks the V4L2 Stateless API, and
+    # desktop software speaks VA-API and essentially nothing else. Upstream's
+    # video module ships the avd-fw firmware plus sofus13's VA-API -> V4L2
+    # Stateless translation layer, and sets LIBVA_DRIVER_NAME globally - libva
+    # picks its driver from the DRM driver name, which is "asahi" here, and no
+    # asahi_drv_video.so will ever exist. It defaults vaapi-support to false for
+    # stability reasons, so ask for it explicitly. (This used to be avd.nix.)
+    # The variable also leaks into the muvm/FEX guest, where the name resolves to
+    # nothing and VA-API init fails - harmless, games use Vulkan, not VA-API.
+    avd.vaapi-support = true;
   };
+
+  # vainfo, for checking that the VA-API setup above actually took.
+  environment.systemPackages = [ pkgs.libva-utils ];
 
   # 没有这行时系统跑在 UTC，DMS 的时钟、日程和夜间模式的日出日落都会错位。
   time.timeZone = "Australia/Melbourne";

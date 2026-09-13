@@ -7,10 +7,10 @@
 let
   display = import ./display.nix { };
 
-  # Hardware video decoding through AVD (see avd.nix) reaches the decoder over
-  # the V4L2 Stateless / Request API, which needs both /dev/video* and
-  # /dev/media*. Firefox's RDD sandbox only ever whitelists M2M /dev/video*
-  # nodes plus a read-only /dev - see AddV4l2Dependencies in
+  # Hardware video decoding through AVD (hardware.asahi.avd, from upstream's
+  # modules/video) reaches the decoder over the V4L2 Stateless / Request API,
+  # which needs both /dev/video* and /dev/media*. Firefox's RDD sandbox only
+  # ever whitelists M2M /dev/video* nodes plus a read-only /dev - see
   # SandboxBrokerPolicyFactory, added for the stateful v4l2m2m decoders on
   # boards like the Raspberry Pi, which need no media controller. There is no
   # /dev/media* rule and no pref to add one, so the sandbox is all-or-nothing
