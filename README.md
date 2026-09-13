@@ -8,6 +8,11 @@
 | `asahi` | 14" MacBook Pro (M2 Pro) 上的 Asahi Linux | NixOS + Home Manager |
 | `XueMacBook-Pro` | **同一台 MacBook 的 macOS 侧** | nix-darwin + Home Manager |
 
+另有一台**不在本仓库**里的机器：`a1`（Oracle Cloud 第二台 aarch64，168.138.9.138），
+自己一份独立 flake 在机器内 `/etc/nixos`（也是 colocated jj 仓库）。
+**Ignition 演示网关 2026-09 已从 `oci` 迁到那里**，文档在那台的 `/etc/nixos/README.md`；
+本仓库只剩 `hosts/oci/network.nix` 里 tailscale 那段历史约束。
+
 `asahi` 和 `XueMacBook-Pro` 是同一台物理机器的两个系统——Asahi Linux 必须与 macOS 双启动，
 所以 macOS 那边也用 nix-darwin（Determinate Nix）管起来：系统级 GUI 应用、字体、
 homebrew（tap/formula/cask 全部声明式）、macOS defaults，外加作为模块运行的
@@ -375,82 +380,6 @@ cp /var/lib/chive/rules-snapshot.toml .         # Backtest 拒绝在没有它的
 chive backtest --strategy breakout \
   --symbol BTC/USDT --from <虚拟仓首日> --to <今天> --principal 500
 ```
-
-## Ignition 演示网关（只在 tailnet 内）
-
-给客户看 demo 用的 SCADA 网关（`hosts/oci/services/ignition.nix`），
-库本身在 `~/Dev/exka_scada`。要点：
-
-- **rootless**，跑在专用系统用户 `exka`（uid 3001）下。不用 `DynamicUser`
-  是因为 rootless podman 要持久家目录和稳定 subuid 段；不复用 `ubuntu`
-  是因为它能 sudo。
-- **只在 tailnet 内可达**（`tailscale0` 上开 8088）。公网防火墙仍然只有 22，
-  其余服务照旧走 cloudflared —— 网关带管理员入口和设备写入能力，不进公网隧道。
-- **镜像按 digest 钉死**（8.3.9 aarch64）。换版本时取
-  `podman manifest inspect docker.io/inductiveautomation/ignition:<tag>`
-  里 `architecture=arm64` 那条的 digest。
-
-### 首次部署
-
-```bash
-# 1. 管理员口令进 sops（admin age key 在 ubuntu@oci 的 ~/.config/sops/age/）
-nix shell nixpkgs#sops -c sops secrets/oci.yaml
-#    加一行: ignition-env: GATEWAY_ADMIN_PASSWORD=<口令>
-
-# 2. 放恢复用的备份。它是构建产物不是配置，所以不进这个仓库：
-#    4MB、含五个开发账号的口令哈希。
-#    在 exka_scada 里产出：./tools/make_gwbk.sh --demo
-H=OCI-Ubuntu-arm                      # ~/.ssh/config 里的别名，没有 oci 这个
-scp dist/exka-hmi-stdlib-<sha>.gwbk $H:/tmp/
-#    按数字 uid 而不是名字 exka：首次 rebuild 之前该用户还不存在。
-#    uid 3001 在 ignition.nix 里静态钉死，正是为了这一步。
-ssh $H 'sudo mkdir -p /var/lib/exka \
-        && sudo install -o 3001 -g 3001 -m 0400 \
-           /tmp/exka-hmi-stdlib-*.gwbk /var/lib/exka/restore.gwbk'
-
-# 3. 应用
-sudo nixos-rebuild switch --flake /etc/nixos
-sudo tailscale up
-
-# 4. 确认端口没漏到公网（别只信防火墙配置）
-#    从任意一台不在 tailnet 里的机器：
-nmap -Pn -p 8088 <oci 公网 IP>        # 期望 filtered/closed
-curl -m 5 http://<tailnet 主机名>:8088/StatusPing   # 期望 {"state":"RUNNING"}
-```
-
-文件和 rebuild 的先后无所谓：挂载源缺失时 podman 直接以
-`statfs ...: no such file or directory` 拒绝启动（不会把它建成目录），
-数据卷仍是空的，补上文件再 `systemctl restart podman-ignition` 恢复照样触发。
-
-首次启动后 `ls -l /var/lib/exka/restore.gwbk` 会显示一个陌生的数字 uid
-（不再是 `exka`）。那是 `:U` 挂载选项让 podman 把它 chown 成了容器用户，
-预期行为，不是文件坏了。
-
-`-r` 恢复**只在数据卷为空时触发一次**（入口脚本对已存在的实例走
-`maybe_run_upgrader`）。所以要回到出厂状态就删卷：
-
-```bash
-sudo -u exka XDG_RUNTIME_DIR=/run/user/3001 podman volume rm ignition-data
-sudo systemctl restart podman-ignition
-```
-
-### 试用期
-
-没有 license，**试用 2 小时**，到期后**页面照常渲染但一切静止**
-（不是白屏，容易误判成数据源坏了）。手工重置：
-
-```bash
-cd ~/Dev/exka_scada
-IGN_GW_URL=http://<tailnet 主机名>:8088 node tools/trial_reset.mjs
-```
-
-商业用途不能用 Maker 版。常开需要正式 license。
-
-### 一个上游行为要留意
-
-`autoSubUidGidRange` 的段是激活期由 `update-users-groups.pl` 分配的。
-若它和别的用户撞了，重新分配时会打印 warning，**已有容器存储的文件属主会失配**。
-出现那条 warning 就得按提示 `chown`，或改用显式 `subUidRanges` 钉住旧段。
 
 ## 已知的坑
 

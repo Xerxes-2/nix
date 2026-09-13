@@ -54,14 +54,8 @@
       # 拆两份是为了让发布方拿不到 admin 的密码哈希。两处的 tk_ 必须一致。
       "ntfy-env" = { };
       "ntfy-token" = { };
-      # ignition-env：GATEWAY_ADMIN_PASSWORD=...（演示网关的管理员口令）。
-      # 归 exka，因为读它的是 podman 自己而不是 systemd：oci-containers 把
-      # environmentFiles 变成 podman 的 --env-file（模块第 482 行），进程已经是
-      # User=exka，读 root:0400 会得到
-      #   Error: parsing file "/run/secrets/ignition-env": permission denied
-      # 其它服务不需要这一行，是因为它们用 DynamicUser + EnvironmentFile，
-      # 那条路径由 systemd 以 root 读、随后才降权。
-      "ignition-env".owner = "exka";
+      # ignition-env 已随演示网关迁往 a1（2026-09）。secrets/oci.yaml 里那条密文
+      # 暂时还在（清它要 admin age key），不声明就不会被解密挂载。
     };
   };
 
