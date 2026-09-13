@@ -239,13 +239,13 @@
       "locked": {
         "lastModified": 1789300272,
         "narHash": "sha256-4Wt5hgBfvOE9acKTyji8Qzwir9YHVyJ/0fCZJGPFK/o=",
-        "owner": "tpwrules",
+        "owner": "nix-community",
         "repo": "nixos-apple-silicon",
         "rev": "cba2f5a3f78ef5fc4ca387f10904309add05dd2e",
         "type": "github"
       },
       "original": {
-        "owner": "tpwrules",
+        "owner": "nix-community",
         "repo": "nixos-apple-silicon",
         "type": "github"
       }
