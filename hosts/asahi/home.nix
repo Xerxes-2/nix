@@ -11,6 +11,40 @@ let
   alacrittyConfig = (pkgs.formats.toml { }).generate "alacritty.toml" {
     general.import = [ "~/.config/alacritty/themes/noctalia.toml" ];
   };
+
+  # voxtype（语音输入，包在 gui.nix）的声明式配置。audio 三项和 output.mode 是
+  # serde 必填字段（config.rs 里没挂 #[serde(default)]），写的就是上游模板的默认
+  # 值，少一个都会解析失败；其余没写的键才真正取默认值。
+  voxtypeConfig = (pkgs.formats.toml { }).generate "voxtype-config.toml" {
+    hotkey = {
+      # 按住说话（push_to_talk 是默认 mode），绑到 F5 听写键：内置键盘
+      # （Apple MTP keyboard）把它上报为 KEY_MICMUTE(248)。voxtype 的按键名
+      # 白名单里没有 MICMUTE，用 EVTEST_ 前缀直接给内核键码。对应的
+      # XF86AudioMicMute 绑定已从 niri/config.kdl 移除，免得录音时静音麦克风。
+      key = "EVTEST_248";
+      modifiers = [ ];
+    };
+    audio = {
+      device = "default";
+      sample_rate = 16000;
+      max_duration_secs = 60;
+    };
+    output.mode = "type";
+    # 不要录音波形 OSD，且必须显式关：上游默认 enabled = true，daemon 会反复
+    # spawn voxtype-osd，而这个构建里唯一的前端（quickshell）需要 PATH 上有
+    # 裸的 `qs`——那意味着 1.2 GB 的 Qt6 闭包，不值得。
+    osd.enabled = false;
+    whisper = {
+      # 多语言模型；模型文件不声明式管理，需要 `voxtype setup model` 下载到
+      # ~/.local/share/voxtype/models（缺文件时 daemon 启动报错，不会自动下）。
+      model = "large-v3-turbo";
+      # 数组形式是受限自动检测：只在中/英之间判语种，短句不会误判成别的语言。
+      language = [
+        "zh"
+        "en"
+      ];
+    };
+  };
 in
 {
   home-manager = {
@@ -42,6 +76,26 @@ in
         };
 
         xdg.configFile."alacritty/alacritty.toml".source = alacrittyConfig;
+
+        xdg.configFile."voxtype/config.toml".source = voxtypeConfig;
+
+        # voxtype 上游只有 `voxtype setup systemd` 的命令式安装，这里照着它生成的
+        # unit（src/setup/systemd.rs）声明同样的内容。挂 graphical-session.target：
+        # wtype 注入文字要 WAYLAND_DISPLAY，niri-session 会把它导进 systemd 用户环境
+        # （noctalia 的 service 同一个前提）。
+        systemd.user.services.voxtype = {
+          Unit = {
+            Description = "voxtype push-to-talk voice-to-text daemon";
+            PartOf = [ "graphical-session.target" ];
+            After = [ "graphical-session.target" ];
+          };
+          Service = {
+            ExecStart = "${lib.getExe pkgs.voxtype-vulkan} daemon";
+            Restart = "on-failure";
+            RestartSec = 5;
+          };
+          Install.WantedBy = [ "graphical-session.target" ];
+        };
 
         # 桌面 shell。声明式默认值写在 ~/.config/noctalia/config.toml（store 里的
         # 只读软链），运行时在设置界面改的东西落到 ~/.local/state/noctalia/

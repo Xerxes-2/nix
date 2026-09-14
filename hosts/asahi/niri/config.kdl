@@ -386,7 +386,9 @@ binds {
     XF86AudioRaiseVolume allow-when-locked=true { spawn "noctalia" "msg" "volume-up" "5"; }
     XF86AudioLowerVolume allow-when-locked=true { spawn "noctalia" "msg" "volume-down" "5"; }
     XF86AudioMute        allow-when-locked=true { spawn "noctalia" "msg" "volume-mute"; }
-    XF86AudioMicMute     allow-when-locked=true { spawn "noctalia" "msg" "mic-mute"; }
+    // 没有 XF86AudioMicMute：F5（听写键，内置键盘上报 KEY_MICMUTE）给了 voxtype
+    // 做 push-to-talk（home.nix）。voxtype 直接听 evdev、不独占设备，如果这里
+    // 同时绑 mic-mute，按住说话的瞬间就会把麦克风静音，录到的全是空白。
 
     // Media keys drive the MPRIS player noctalia is tracking.
     // This will work with any MPRIS-enabled media player.

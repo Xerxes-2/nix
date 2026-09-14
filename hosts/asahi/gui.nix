@@ -319,6 +319,12 @@ in
     pavucontrol
     telegram-desktop
     vesktop # Discord client; official Discord has no aarch64-linux build.
+    # 按住说话的语音输入（whisper.cpp 后端）。选 -vulkan 变体：whisper.cpp 以
+    # gpu-vulkan 编译，Honeykrisp 上实测模型加载进 Vulkan0、推理走 GPU
+    # （`voxtype -v transcribe` 打印 "using Vulkan0 backend"）。热键靠 evdev
+    # （configuration.nix 已把用户放进 input 组），Wayland 下文字经 wtype 注入。
+    # 模型不声明式管理：`voxtype setup model` 下载到 ~/.local/share/voxtype。
+    voxtype-vulkan
     # Wayland application forwarding over ssh - one binary that is both ends,
     # `waypipe ssh <host> <app>` wraps the ssh call and starts the far side
     # itself. The macOS counterpart is the waypipe-darwin brew (plus cocoa-way
