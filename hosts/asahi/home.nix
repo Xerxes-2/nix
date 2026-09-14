@@ -149,37 +149,24 @@ in
           };
         };
 
-        # 图标主题的一次性引导。这段原本还负责给 DMS 播种 settings.json，那半边
-        # 随 dms-greeter 一起删了。剩下的 GTK / Qt 两个循环没有替代品：noctalia
-        # 的 gtk / qt 模板只写配色（gtk.css、qt5ct/colors/noctalia.conf），从不
-        # 碰图标主题。marker 换了路径，所以这台机器上会再幂等地跑一次。
-        #
-        # TODO revisit: 想换成 home-manager 的 gtk 模块接管 settings.ini 时
-        #   check: 它是否也会声明式接管 gtk.css —— 那正是 noctalia 的 gtk
-        #          apply.sh 要写的文件，一旦变成只读软链，每次换主题都会失败
-        #   then:  GTK 那半边换成 gtk.iconTheme，Qt 那半边照旧
+        # Noctalia owns the mutable gtk.css files. With only iconTheme set,
+        # Home Manager writes settings.ini but does not declare gtk.css, so
+        # dynamic palette changes remain writable.
+        gtk = {
+          enable = true;
+          iconTheme = {
+            package = pkgs.adwaita-icon-theme;
+            name = "Adwaita";
+          };
+        };
+
+        # Noctalia's Qt template only writes the palette, and Home Manager has
+        # no standalone Qt icon-theme option. Seed qt5ct/qt6ct once instead.
         home.activation.iconTheme = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           marker="$HOME/.local/state/nixcfg/.icon-theme-adwaita"
 
           if [ ! -e "$marker" ]; then
             mkdir -p "$(dirname "$marker")"
-
-            for toolkit in gtk-3.0 gtk-4.0; do
-              config_dir="$HOME/.config/$toolkit"
-              config_file="$config_dir/settings.ini"
-              mkdir -p "$config_dir"
-              if [ -f "$config_file" ]; then
-                if grep -q '^gtk-icon-theme-name=' "$config_file"; then
-                  sed -i 's/^gtk-icon-theme-name=.*/gtk-icon-theme-name=Adwaita/' "$config_file"
-                elif grep -q '^\[Settings\]' "$config_file"; then
-                  sed -i '/^\[Settings\]/a gtk-icon-theme-name=Adwaita' "$config_file"
-                else
-                  printf '\n[Settings]\ngtk-icon-theme-name=Adwaita\n' >> "$config_file"
-                fi
-              else
-                printf '[Settings]\ngtk-icon-theme-name=Adwaita\n' > "$config_file"
-              fi
-            done
 
             for toolkit in qt5ct qt6ct; do
               config_dir="$HOME/.config/$toolkit"

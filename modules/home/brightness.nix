@@ -58,15 +58,17 @@ in
   #
   # TODO revisit: on wluma bumps - 4.11.1 is well behind upstream main, and the
   # newer config schema is incompatible in both directions
-  #   check: wluma --version; then diff the config schema against
-  #          https://github.com/maximbaz/wluma/blob/<version>/config.toml
-  #   then:  main has moved to ext-image-copy-capture-v1, added an [idle]
-  #          section (would overlap with whatever DMS idle handling exists by
-  #          then) and a per-output `gamma` flag. That flag matters: newer
-  #          wluma takes wlr-gamma-control *exclusively* for its dim/colour
-  #          temperature feature, which would fight both DMS night light and
-  #          the niri software-gamma patch. Set `gamma = false` when bumping.
-  #   last:  2026-09, 4.11.1 - unchanged: no [idle], no gamma, uses wlr-screencopy
+  #   check: nix eval --raw /etc/nixos#nixosConfigurations.asahi.pkgs.wluma.version
+  #          then compare against the Configuration section in
+  #          https://github.com/max-baz/wluma/blob/<version>/README.md
+  #   then:  5.0 has moved to ext-image-copy-capture-v1, added an [idle]
+  #          section (which overlaps with Noctalia's idle handling) and a
+  #          per-output `gamma` flag. That flag matters: newer wluma takes
+  #          wlr-gamma-control *exclusively* for its dim/colour-temperature
+  #          feature, which would fight both Noctalia night light and the niri
+  #          software-gamma patch. Set `gamma = false` when bumping.
+  #   last:  2026-09, nixpkgs is still on 4.11.1: no [idle], no gamma, and
+  #          wlr-screencopy only; upstream has released 5.0.0.
   xdg.configFile."wluma/config.toml".source = wlumaConfig;
 
   systemd.user.services.wluma = {

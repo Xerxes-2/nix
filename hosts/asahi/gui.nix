@@ -29,8 +29,8 @@ let
   #          mozilla-firefox/firefox - it walks /dev itself, so a `media` match
   #          in that file is the signal
   #   then:  drop the MOZ_DISABLE_RDD_SANDBOX wrapper below
-  #   last:  2026-09, firefox 155 / zen 1.21.16b - the file mentions nothing but
-  #          /dev/video*, on release and on main
+  #   last:  2026-09, firefox 155.0.1 / zen 1.22.1b - the file mentions
+  #          nothing but /dev/video*, on release and on main
   #
   # The flake's own `env` option would do this, but it lives in its home-manager
   # module and hangs the var off the *unwrapped* derivation (gappsWrapperArgs
@@ -207,24 +207,6 @@ in
       output.scale = display.scale;
     };
   };
-
-  # Two warnings the greeter logs on every start are expected here and not
-  # worth chasing:
-  #
-  #   [WRN] [greeter-config] failed to open '/var/lib/noctalia-greeter/greeter.toml' for write
-  #   [WRN] [greeter-config] migrated sync.toml but failed to strip runtime keys from [...]
-  #
-  # It wants to write back the last-used session and user, but the module
-  # symlinks greeter.toml into the store (`L+` tmpfiles rule), so the file is
-  # read-only by construction. The nixpkgs module documents this as an upstream
-  # limitation - state is due to move to its own file. Nothing is lost while
-  # `session.default` and `user.default` above pin exactly the state it wanted
-  # to persist.
-  #
-  # TODO revisit: on noctalia-greeter bumps
-  #   check: journalctl -b -u greetd | grep greeter-config
-  #   then:  drop this note once upstream stops writing to greeter.toml
-  #   last:  2026-09, noctalia-greeter 1.3.1 - still warns on every start
 
   # Desktop plumbing.
   services.dbus.enable = true;

@@ -60,11 +60,12 @@
   # 1000, systemd-oomd deliberately ignores every ManagedOOMPreference=
   # exemption set inside the session (systemd.resource-control(5)).
   #
-  # Monitoring app.slice inside the user manager instead gives per-application
-  # granularity: the candidates are the individual app cgroups (the browser and
-  # Telegram run as run-p*.scope, terminals as app-niri-alacritty-*.scope), the
-  # compositor cannot be touched because niri.service lives in session.slice,
-  # and exemptions are honoured because monitor and candidates share a UID.
+  # Monitoring app.slice inside the user manager keeps the compositor safe in
+  # session.slice and lets oomd choose among app cgroups such as niri's terminal
+  # scopes. Programs launched by Noctalia inherit noctalia.service and therefore
+  # form one candidate with the shell; do not exempt that service, because doing
+  # so would also shield a runaway browser below it. Preferences are honoured
+  # here because monitor and candidates share a UID.
   #
   # 50% is Fedora's desktop value. The metric is the fraction of a 10s window in
   # which *every* task in the cgroup was stalled, sustained for 30s, so this
@@ -76,10 +77,11 @@
   # move
   #   check: oomctl        # the user app.slice must be listed under
   #                        # "Monitored memory pressure cgroups"
-  #   then:  if the NixOS module ever monitors app.slice itself, delete this
-  #   last:  2026-09, systemd 261.2 - nixpkgs oomd module still leaves
-  #          enableRootSlice / enableSystemSlice / enableUserSlices all off,
-  #          and even enableUserSlices only touches user@.slice, not app.slice
+  #   then:  replace this only if the NixOS module can target app.slice without
+  #          also arming the root-owned user.slice and session.slice
+  #   last:  2026-09, systemd 261.2 - app.slice is monitored at 50%. The
+  #          nixpkgs option now arms every user-manager slice, but also
+  #          user.slice; it still cannot express the app.slice-only policy here.
   systemd.user.units."app.slice" = {
     overrideStrategy = "asDropin";
     text = ''
@@ -88,17 +90,6 @@
       ManagedOOMMemoryPressureLimit=50%
     '';
   };
-
-  # DMS is session infrastructure that merely happens to sit in app.slice - the
-  # bar, notifications, launcher and lock screen all die with it. At ~400M it
-  # would never win the "most reclaim activity" contest against a browser
-  # anyway, but make that explicit. `avoid` rather than `omit`, so a genuine
-  # runaway in DMS itself can still be dealt with as a last resort.
-  #
-  # This merges into the unit the DMS module already declares; declaring
-  # `systemd.user.units."dms.service"` here instead would be a second, competing
-  # definition of the same unit and fails to evaluate.
-  systemd.user.services.dms.serviceConfig.ManagedOOMPreference = "avoid";
 
   # Stop charging at 80% to slow battery wear.
   #
@@ -124,10 +115,9 @@
   #   check: cat /sys/class/power_supply/macsmc-battery/charge_control_end_threshold
   #          # 80 = in effect, 100 = no limit, ENOENT = driver dropped it
   #   then:  fall back to charge_behaviour, or drop the rule if it is a no-op
-  #   last:  2026-09, 7.1.12 - macsmc-power still registers
-  #          CHARGE_CONTROL_{START,END}_THRESHOLD (gated on CHWA/CHLS), so the
-  #          rule still has something to write. Read from the kernel source on
-  #          oci; sysfs not re-read on the machine itself.
+  #   last:  2026-09, 7.1.13 - sysfs reads 80 on this machine, and the source
+  #          still registers CHARGE_CONTROL_{START,END}_THRESHOLD when CHWA or
+  #          CHLS is present.
   services.udev.extraRules = ''
     SUBSYSTEM=="power_supply", KERNEL=="macsmc-battery", ATTR{charge_control_end_threshold}="80"
   '';
@@ -179,10 +169,9 @@
   #          cat /sys/devices/system/cpu/cpufreq/policy4/scaling_cur_freq
   #          # 3264000 = schedutil still capped, 3504000 = the fix landed
   #   then:  delete the cpu-boost unit below, the tmpfiles flag is enough
-  #   last:  2026-09, 7.1.12 - fix still not in the tree: capacity_freq_ref is
-  #          still latched from policy->cpuinfo.max_freq at
-  #          CPUFREQ_CREATE_POLICY (arch_topology.c:407) and nothing in
-  #          arch_topology touches boost. Not re-measured on the machine.
+  #   last:  2026-09, 7.1.13 - a pinned load still tops out at 3264000;
+  #          capacity_freq_ref is still latched from policy->cpuinfo.max_freq at
+  #          CPUFREQ_CREATE_POLICY (arch_topology.c:407).
   systemd.tmpfiles.rules = [
     "w /sys/devices/system/cpu/cpufreq/boost - - - - 1"
   ];

@@ -52,7 +52,8 @@ TODO revisit: on muvm / Fedora Asahi updates.
 - check: inside the guest, `ls /run/dbus/system_bus_socket`
 - then: drop `steam-dbus-bootstrap.py` once a system bus is already there, or
   once `muvm -x` runs late enough to be usable
-- last: 2026-08, still needed
+- last: 2026-09, muvm 0.5.1 still starts the payload without the socket;
+  using the upstream script through `-x` exits 1 before the payload starts
 
 ### 2. Tofu everywhere
 
@@ -101,7 +102,8 @@ TODO revisit: when Proton or the Steam Linux Runtime is updated.
 - then: delete `compatibilitytools.d/proton9-nosrt` once a stock Proton gets a
   GL context inside pressure-vessel
 - last: 2026-09, bug still `UNCONFIRMED` (untouched upstream since 2025-10).
-  The SLR half was not re-checked - it needs the MacBook.
+  Proton Experimental 11.0-20260814b with SLR 4.0.20260805 still exits on
+  Isaac, while Proton 9 without SLR gets a 32-bit OpenGL 4.6 context and runs.
 
 ## Notes
 
