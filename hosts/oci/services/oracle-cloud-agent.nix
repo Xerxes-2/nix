@@ -28,10 +28,13 @@ let
   #          看 latest/stable 的 revision 与 version
   #   then:  换下面的 revision / version / hash，rebuild 后确认日志里有
   #          "Sent metrics status: 200"
-  #   last:  2026-09，1.61.0-6（snap revision 125）仍是 latest/stable，
-  #          monitoring.log 里每分钟一条 "Sent metrics status: 200"
-  version = "1.61.0-6";
-  revision = "125";
+  #   last:  2026-09，latest/stable 已经是 1.63.0-9（snap revision 134，
+  #          2026-09-22 发布），替代了原先 pin 的 1.61.0-6（revision 125），
+  #          于是换 pin；解包布局不变，agent 与 gomon 仍是 aarch64 静态 ELF。
+  #          monitoring.log 里那每分钟一条 "Sent metrics status: 200" 要等
+  #          switch 到这一代之后才能复核
+  version = "1.63.0-9";
+  revision = "134";
 
   oca = pkgs.stdenvNoCC.mkDerivation (finalAttrs: {
     pname = "oracle-cloud-agent";
@@ -41,7 +44,7 @@ let
     # 这个 URL 只有 arm64 的包，换架构要重新查（见上面的 check）。
     src = pkgs.fetchurl {
       url = "https://api.snapcraft.io/api/v1/snaps/download/ltx4XjES2e2ujitNIuO5GxPYDM6lp6ry_${revision}.snap";
-      hash = "sha256-U83Y/hO6XLgDcGIgAXFFpUgyme8j3c45Gzz5mYZbM+M=";
+      hash = "sha256-cF4hK2HnPy+Y465ETMYuCjCW2vldJoROGs4rDXNgkmI=";
     };
 
     nativeBuildInputs = [ pkgs.squashfsTools ];
