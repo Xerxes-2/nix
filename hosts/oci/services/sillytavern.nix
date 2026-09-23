@@ -11,31 +11,33 @@ let
   stRoot = "${cfg.package}/lib/node_modules/sillytavern";
 
   # Claude Pro/Max 订阅登录的服务端插件（自己的仓库，见 flake input）。
-  # 用 pnpm 锁文件把 node_modules 在 nix 里装好，整个插件目录进 store：
-  # 上游 ST 的"clone 到 plugins/ 再 npm install"在只读的包目录里做不了，
-  # 也不想让服务用户手工维护一份 node_modules。
-  claudeOAuthPlugin = pkgs.stdenv.mkDerivation (finalAttrs: {
+  # 插件零运行时依赖：Claude OAuth 流程由上游的 scripts/build-vendor.mjs 预先打进
+  # vendor/，package.json 的 dependencies 是空的（上游 README："没有第二步，也不用
+  # npm install"）。所以这里不跑 pnpm，源码原样进 store 就是一个完整的插件——
+  # 反正上游 ST 那套"clone 到 plugins/ 再 npm install"在只读的包目录里也做不了。
+  # 下面的断言盯着 dependencies：哪天上游真加了运行时依赖，构建会停在这里，
+  # 而不是悄悄装出一个 import 就炸的插件（那时再把 pnpm 打包方式加回来）。
+  claudeOAuthPlugin = pkgs.stdenv.mkDerivation {
     pname = "sillytavern-claude-oauth";
     version = "0.1.0";
     src = inputs.sillytavern-claude-oauth;
-    nativeBuildInputs = [
-      pkgs.nodejs_24
-      pkgs.pnpm_10
-      pkgs.pnpmConfigHook
-    ];
-    # 插件的 .npmrc 已设 node-linker=hoisted，所以这里出来的是扁平 node_modules，
-    # 和 npm 的布局一致，ST 的 plugin-loader 直接 import 即可。
-    pnpmDeps = pkgs.fetchPnpmDeps {
-      inherit (finalAttrs) pname version src;
-      fetcherVersion = 4;
-      # 插件 pnpm-lock.yaml 变了要重算：把 hash 置空 rebuild，抄报错里的 got:。
-      hash = "sha256-fDCcM/jktDA+hs0ZstzkT7bu8gl8U/PiGfBIA775jYg=";
-    };
+    nativeBuildInputs = [ pkgs.jq ];
+    dontConfigure = true;
+    dontBuild = true;
     installPhase = ''
+      runHook preInstall
+      deps=$(jq -r '.dependencies // {} | length' package.json)
+      if [ "$deps" != "0" ]; then
+        echo "插件 package.json 现在有 $deps 个运行时依赖，这份表达式只拷源码，" >&2
+        echo "装出来的插件会缺 node_modules：需要改回 pnpm 打包（pnpm.fetchDeps + pnpm.configHook）。" >&2
+        exit 1
+      fi
       mkdir -p $out
-      cp -r index.mjs lib package.json node_modules $out/
+      # vendor/ 是运行时必需的（lib/pi-oauth.mjs 从这里加载 OAuth 流程和它的 manifest）。
+      cp -r index.mjs lib vendor package.json $out/
+      runHook postInstall
     '';
-  });
+  };
 in
 {
   # SillyTavern 原生服务（从 rootless 容器迁入，2026-08）。
