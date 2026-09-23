@@ -428,6 +428,23 @@ curl -sH 'Authorization: Bearer Oracle' http://169.254.169.254/opc/v2/instance/ 
 **合盖休眠每小时掉 2-3% 电**，是 s2idle 的已知状态（AsahiLinux/linux#262），配置层面
 无解。
 
+**真彩（24-bit）跨 SSH 得两端配，终端自己说了不算。** 终端把自己支持真彩这件事写在
+`COLORTERM` 里，而 ssh 默认只带走 `TERM`（走 pty-req，不受 `AcceptEnv` 管），sshd 又
+默认拒收任何客户端环境变量 —— 于是对面只剩 `TERM=xterm-kitty`，而 pi 的能力探测偏偏
+不看 TERM 认 kitty（只认 `COLORTERM` / `KITTY_WINDOW_ID` / `TERM_PROGRAM`），就把会话
+判成 256 色。`hosts/oci/services/misc.nix` 已经放行，**客户端还得 SendEnv**：
+
+```sshconfig
+Host *
+  SendEnv COLORTERM
+```
+
+仓库管的客户端都打开了：macOS 侧在 `hosts/darwin/home.nix` 的 programs.ssh 里，
+asahi 在 `hosts/asahi/configuration.nix`（系统级 `ssh_config`，不动没进仓库的
+`~/.ssh/config`）。跑 kitty 的 cachyos 不归仓库管，连 `oci` 前自己补上。验证：
+`PI_TUI_WRITE_LOG=/tmp/pi.log pi` 之后看日志里有没有 `38;2;`（真彩是 `38;2;r;g;b`，
+256 色是 `38;5;n`）——一个都没有就是没生效，`PI_TRUE_COLOR=1` 可临时盖上。
+
 **新文件必须先让 jj 快照到，否则 nix 看不见**（报 `Path '...' is not tracked by
 Git`）。跑一条 `jj st` 即可，原理见 `AGENTS.md`。
 

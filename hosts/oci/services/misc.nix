@@ -16,6 +16,13 @@
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
       PermitRootLogin = "no";
+      # sshd 默认不接受任何客户端环境变量，于是终端里的 COLORTERM 到不了这里
+      # （TERM 例外：它走 pty-req，不经 AcceptEnv）。缺了 COLORTERM，pi 的能力
+      # 探测就退回 256 色：它只认 COLORTERM / KITTY_WINDOW_ID / TERM_PROGRAM，
+      # 偏偏不看 TERM 里的 xterm-kitty（supports-color 那套看，所以 bat / eza
+      # 在同一个会话里照常 24 位色）。只放行这一个；客户端侧还须 SendEnv 才送得
+      # 过来，两边都要配，见 README「已知的坑」。
+      AcceptEnv = [ "COLORTERM" ];
     };
   };
 

@@ -197,6 +197,9 @@
               ServerAliveInterval = 30;
               ServerAliveCountMax = 3;
               TCPKeepAlive = "yes";
+              # 终端把 COLORTERM 只放在自己进程的环境里，ssh 默认只带走 TERM，
+              # 所以 ghostty 的真彩身份到不了 oci（那边的 sshd 已经 AcceptEnv）。
+              SendEnv = "COLORTERM";
             };
           };
         };

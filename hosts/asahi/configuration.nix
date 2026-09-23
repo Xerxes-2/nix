@@ -45,6 +45,12 @@
   # /etc/fish/* environment shims. Same as on oci.
   programs.fish.enable = true;
 
+  # ssh 客户端：默认不带走 COLORTERM，连到 oci 的会话里就只剩 TERM 活着，pi 会
+  # 把 alacritty 当 256 色终端（oci 的 sshd 已 AcceptEnv COLORTERM）。写系统级
+  # ssh_config 而不是 Home Manager 的 ~/.ssh/config：后者是没进仓库的用户文件，
+  # 托管它会把里面的 Host 别名挪走。
+  programs.ssh.extraConfig = "SendEnv COLORTERM";
+
   # The panel is 3024x1964, which makes the default 8x16 console font unreadable
   # - relevant exactly when it hurts, i.e. when the graphical session is broken
   # and a VT is all that is left.
