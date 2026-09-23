@@ -29,8 +29,9 @@ let
   #          mozilla-firefox/firefox - it walks /dev itself, so a `media` match
   #          in that file is the signal
   #   then:  drop the MOZ_DISABLE_RDD_SANDBOX wrapper below
-  #   last:  2026-09, firefox 155.0.1 / zen 1.22.1b - the file mentions
-  #          nothing but /dev/video*, on release and on main
+  #   last:  2026-09, firefox 156.0 / zen 1.22.2b - AddV4l2Dependencies still
+  #          opens /dev itself and matches only the "video" prefix, on
+  #          FIREFOX_156_0_RELEASE and on mozilla-central, no /dev/media
   #
   # The flake's own `env` option would do this, but it lives in its home-manager
   # module and hangs the var off the *unwrapped* derivation (gappsWrapperArgs
