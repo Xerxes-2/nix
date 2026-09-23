@@ -330,11 +330,11 @@
     "sillytavern-claude-oauth": {
       "flake": false,
       "locked": {
-        "lastModified": 1790158726,
-        "narHash": "sha256-L3abmov1Mvx7OCaKKIQ8qaK1QxmXpO/6Pw/99sq24DE=",
+        "lastModified": 1790168323,
+        "narHash": "sha256-GLUncGC8c/96ofsns0Dud907NAbHOiANm5tAT3amxYM=",
         "owner": "Xerxes-2",
         "repo": "sillytavern-claude-oauth",
-        "rev": "77d5d2b537fab0535ec920a92ea305b56d0d6043",
+        "rev": "4f817dfbe203261a6fa465ed8122ff0c32072e79",
         "type": "github"
       },
       "original": {
@@ -393,11 +393,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1790101991,
-        "narHash": "sha256-bNnRLtCtn2kCMeoQ/F1SBW4ltv4moQOPZ8YT0BWsoT0=",
+        "lastModified": 1790160881,
+        "narHash": "sha256-VTHBBI0EvApXSssCthrYLsrGN4/0nM/tW9A17NEmKEU=",
         "owner": "0xc000022070",
         "repo": "zen-browser-flake",
-        "rev": "6be82ac04e6713849ae23ec45cd606d96f3174d7",
+        "rev": "1b16ef2b81078b5f363e6bb689d2193f8eccadb7",
         "type": "github"
       },
       "original": {
