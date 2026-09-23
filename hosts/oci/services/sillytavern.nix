@@ -54,9 +54,14 @@ in
   # symlink（plugin-loader 用 statSync，跟随 symlink），要临时试别的插件也能直接丢进去。
   # sillytavern.yaml 里对应 enableServerPlugins: true、enableServerPluginsAutoUpdate: false
   # （自动更新会对每个插件目录跑 git pull，对 store symlink 没意义还会刷警告）。
-  systemd.services.sillytavern.serviceConfig.BindPaths = [
-    "%S/SillyTavern/plugins:${stRoot}/plugins"
-  ];
+  systemd.services.sillytavern = {
+    serviceConfig.BindPaths = [
+      "%S/SillyTavern/plugins:${stRoot}/plugins"
+    ];
+    # 插件换版本只是 tmpfiles 改了一个 symlink，unit 本身没变，switch 不会重启服务，
+    # 旧代码会一直留在内存里。把插件包列为触发器让它跟着重启。
+    restartTriggers = [ claudeOAuthPlugin ];
+  };
   systemd.tmpfiles.settings.sillytavern = {
     "/var/lib/SillyTavern/plugins".d = {
       mode = "0700";
