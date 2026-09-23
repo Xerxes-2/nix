@@ -321,9 +321,26 @@
         "nix-darwin": "nix-darwin",
         "nixos-apple-silicon": "nixos-apple-silicon",
         "nixpkgs-unstable": "nixpkgs-unstable",
+        "sillytavern-claude-oauth": "sillytavern-claude-oauth",
         "sops-nix": "sops-nix",
         "xsz": "xsz",
         "zen-browser": "zen-browser"
+      }
+    },
+    "sillytavern-claude-oauth": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790155749,
+        "narHash": "sha256-5Efc0yfXEpdnRsoKHPKydPBIOnSFUgzROnoPs11yej0=",
+        "owner": "Xerxes-2",
+        "repo": "sillytavern-claude-oauth",
+        "rev": "a430ba7059500ecdf6fdda241e212f2ca269ea32",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Xerxes-2",
+        "repo": "sillytavern-claude-oauth",
+        "type": "github"
       }
     },
     "sops-nix": {

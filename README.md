@@ -386,6 +386,26 @@ chive backtest --strategy breakout \
   --symbol BTC/USDT --from <虚拟仓首日> --to <今天> --principal 500
 ```
 
+## SillyTavern 的 Claude 订阅登录插件
+
+`hosts/oci/services/sillytavern.nix`。服务端插件来自自己的仓库
+[sillytavern-claude-oauth](https://github.com/Xerxes-2/sillytavern-claude-oauth)（flake input，
+`flake = false`），在 nix 里用 pnpm 锁文件装好 node_modules 后整个进 store，
+以 symlink 形式落在 `/var/lib/SillyTavern/plugins/claude-oauth`（这个目录 BindPaths 进
+ST 只读的包目录 `plugins/`，和上游模块对 `extensions/` 的做法一样）。
+`sillytavern.yaml` 里 `enableServerPlugins: true`、`enableServerPluginsAutoUpdate: false`。
+
+界面扩展是同一个仓库，在 ST「扩展 → 安装扩展」里粘仓库地址装即可（走 ST 自己的
+extensions 目录，不归 nix 管）。凭据落在 `/var/lib/SillyTavern/data/<用户>/claude-oauth/`。
+
+```bash
+journalctl -u sillytavern | grep claude-oauth   # 期望看到 Reverse proxy URL ... http://127.0.0.1:45277/v1
+```
+
+**更新插件**：`nix flake update sillytavern-claude-oauth` 再 switch。若上游的
+`pnpm-lock.yaml` 变了，构建会报 pnpmDeps hash 不匹配：把 nix 里的 `hash` 置空，
+rebuild，抄报错里的 `got:` 回去。
+
 ## 已知的坑
 
 **DRM 流媒体（Netflix / Spotify Web / Prime）需要 Widevine，Mozilla 不给 aarch64 出。**

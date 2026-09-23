@@ -49,6 +49,13 @@
       url = "github:Xerxes-2/chive-rs/paper-v1";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
+    # SillyTavern 的 Claude 订阅登录插件（自己的仓库，不是 flake，只当源码用）。
+    # 打包和挂载在 hosts/oci/services/sillytavern.nix。更新它就是 flake update
+    # 这一个输入；若上游 pnpm-lock.yaml 变了，那边的 pnpmDeps hash 也要跟着换。
+    sillytavern-claude-oauth = {
+      url = "github:Xerxes-2/sillytavern-claude-oauth";
+      flake = false;
+    };
   };
 
   outputs =

@@ -149,8 +149,8 @@ gemini:
   enableSystemPromptCache: false
   image:
     personGeneration: allow_adult
-enableServerPlugins: false
-enableServerPluginsAutoUpdate: true
+enableServerPlugins: true
+enableServerPluginsAutoUpdate: false
 enableKeepAlive: false
 privateAddressWhitelist:
   enabled: false
