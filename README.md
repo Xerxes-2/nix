@@ -398,6 +398,10 @@ ST 只读的包目录 `plugins/`，和上游模块对 `extensions/` 的做法一
 界面扩展是同一个仓库，在 ST「扩展 → 安装扩展」里粘仓库地址装即可（走 ST 自己的
 extensions 目录，不归 nix 管）。凭据落在 `/var/lib/SillyTavern/data/<用户>/claude-oauth/`。
 
+**ubuntu 免 sudo 访问**：ubuntu 在 `sillytavern` 组里，`data/`、`extensions/`、`plugins/`
+是 `2770`（setgid），服务 `UMask=0007`。ubuntu 手动放进去的文件默认只有组读，记得
+`chmod g+w`，否则服务改不动。
+
 ```bash
 journalctl -u sillytavern | grep claude-oauth   # 期望看到 Reverse proxy URL ... http://127.0.0.1:45277/v1
 ```

@@ -60,13 +60,22 @@ in
     serviceConfig.BindPaths = [
       "%S/SillyTavern/plugins:${stRoot}/plugins"
     ];
+    # 新文件对组可读写（配合下面的 2770 目录和 ubuntu 入组），其他人不可见。
+    serviceConfig.UMask = "0007";
     # 插件换版本只是 tmpfiles 改了一个 symlink，unit 本身没变，switch 不会重启服务，
     # 旧代码会一直留在内存里。把插件包列为触发器让它跟着重启。
     restartTriggers = [ claudeOAuthPlugin ];
   };
+  # ubuntu 入 sillytavern 组，免 sudo 直接读写数据；服务仍以 sillytavern 身份在沙箱里跑。
+  # 目录 2770：组可读写，setgid 让新文件继承 sillytavern 组。tmpfiles 的 d 只管目录本身，
+  # 已有内容需一次性手动修：chmod -R g+rwX,o-rwx + 给子目录 g+s。
+  # 注意 ubuntu 默认 umask 022，手动放进去的文件要 chmod g+w，服务才能改。
+  users.users.ubuntu.extraGroups = [ cfg.group ];
   systemd.tmpfiles.settings.sillytavern = {
+    "/var/lib/SillyTavern/data".d.mode = lib.mkForce "2770";
+    "/var/lib/SillyTavern/extensions".d.mode = lib.mkForce "2770";
     "/var/lib/SillyTavern/plugins".d = {
-      mode = "0700";
+      mode = "2770";
       inherit (cfg) user group;
     };
     "/var/lib/SillyTavern/plugins/claude-oauth"."L+" = {
