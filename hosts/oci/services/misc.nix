@@ -82,6 +82,25 @@
 
   # mosh（模块会自动放行 UDP 60000-61000）
   programs.mosh.enable = true;
+  # GCC 16 默认 C++20，abseil 20260817 因此装出启用 std::*_ordering 的头文件；
+  # mosh 自带的旧 m4 宏把标准强行压回 -std=gnu++17，configure 的 protoc 检查
+  # 直接编译失败。这里照搬上游修复：删掉 m4/，改用 autoconf-archive 的新宏。
+  #   https://github.com/NixOS/nixpkgs/commit/3f6a1a107f818579c63976147c37050c2b722997
+  # （上游同时删了 eee1a8cf 那个 protobuf 23 补丁，只因宏更新后不再需要；
+  #  这里保留它无害，免得改动面超出修复本身。）
+  #
+  # TODO revisit: 每次 flake 更新 nixpkgs 后
+  #   check: nix eval --raw .#nixosConfigurations.oci.pkgs.mosh.nativeBuildInputs \
+  #            --apply 'l: toString l' | grep -q autoconf-archive
+  #   then:  命中说明上游修复已进 nixos-unstable，删掉下面的 package 覆盖
+  #   last:  2026-10, nixpkgs b4fd65b 尚未包含 3f6a1a1，mosh 1.4.0 构建失败
+  programs.mosh.package = pkgs.mosh.overrideAttrs (old: {
+    nativeBuildInputs = old.nativeBuildInputs ++ [ pkgs.autoconf-archive ];
+    postPatch = ''
+      rm -rf m4
+    ''
+    + old.postPatch;
+  });
 
   # btrfs 在线去重，参数照搬旧 Ubuntu /etc/bees 配置
   services.beesd.filesystems.root = {

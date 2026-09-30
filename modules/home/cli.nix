@@ -1,6 +1,28 @@
 # 跨机器共享的 CLI 工具集（Home Manager 模块，Linux/macOS 通用）。
 # 各 host 的 home.nix 导入此模块，平台特有工具在各自 host 里追加。
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
+let
+  # herdr 编译时把 vendor 的 libghostty-vt 用 zig 打成静态库，默认把 zig 的
+  # compiler_rt/ubsan_rt 一并塞进 .a；binutils 2.46 的 ld.bfd 处理不了其中
+  # .debug_loc 的重定位，链接报 `undefined reference to 'no symbol'`。
+  # 照搬上游修复：Linux 上不打包这两个运行时（由系统工具链提供）。
+  #   https://github.com/NixOS/nixpkgs/commit/277383a8335767cb1a59bf5ef2cc511b955f0a6b
+  #
+  # TODO revisit: 每次 flake 更新 nixpkgs 后
+  #   check: grep -q bundle_compiler_rt "$(nix eval --raw \
+  #            .#nixosConfigurations.oci.pkgs.herdr.meta.position | cut -d: -f1)"
+  #   then:  命中说明上游修复已进频道，删掉这个 let 绑定，改回直接用 pkgs.herdr
+  #   last:  2026-10, nixos-unstable b4fd65b 尚未包含 277383a
+  herdr = pkgs.herdr.overrideAttrs (old: {
+    postPatch =
+      (old.postPatch or "")
+      + lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''
+        substituteInPlace vendor/libghostty-vt/src/build/GhosttyLibVt.zig \
+          --replace-fail 'lib.bundle_compiler_rt = true;' 'lib.bundle_compiler_rt = false;' \
+          --replace-fail 'lib.bundle_ubsan_rt = true;' 'lib.bundle_ubsan_rt = false;'
+      '';
+  });
+in
 {
   # 登录 shell。真正把 fish 设为登录 shell 的是各系统层的
   # `programs.fish.enable`（NixOS 上还有 `users.users.<u>.shell`；darwin 上
@@ -28,7 +50,7 @@
     gh
     git
     go
-    herdr
+    herdr # 用上面 let 里打过补丁的版本，不是 pkgs.herdr
     htop
     jjui
     jq
