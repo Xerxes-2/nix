@@ -29,9 +29,9 @@ let
   #          mozilla-firefox/firefox - it walks /dev itself, so a `media` match
   #          in that file is the signal
   #   then:  drop the MOZ_DISABLE_RDD_SANDBOX wrapper below
-  #   last:  2026-09, firefox 156.0 / zen 1.22.2b - AddV4l2Dependencies still
+  #   last:  2026-10, firefox 157.0 / zen 1.22.3b - AddV4l2Dependencies still
   #          opens /dev itself and matches only the "video" prefix, on
-  #          FIREFOX_156_0_RELEASE and on mozilla-central, no /dev/media
+  #          FIREFOX_157_0_RELEASE and on mozilla-central, no /dev/media
   #
   # The flake's own `env` option would do this, but it lives in its home-manager
   # module and hangs the var off the *unwrapped* derivation (gappsWrapperArgs
@@ -92,7 +92,7 @@ let
   #          pkgs/applications/networking/browsers/firefox/wrapper.nix), and
   #          whether widevine-cdm still installs only the Chromium layout
   #   then:  drop the prefs/GMP dir in favour of whatever option it exposes
-  #   last:  2026-09, widevine-cdm 120.0.6098.0-7a3928f - unchanged, and
+  #   last:  2026-10, widevine-cdm 120.0.6098.0-7a3928f - unchanged, and
   #          wrapper.nix still has no mention of gmp/widevine at all
   widevineGmp = pkgs.runCommand "widevine-gmp" { } ''
     cdm=${pkgs.widevine-cdm}/share/google/chrome/WidevineCdm

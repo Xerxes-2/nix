@@ -28,11 +28,9 @@ let
   #          看 latest/stable 的 revision 与 version
   #   then:  换下面的 revision / version / hash，rebuild 后确认日志里有
   #          "Sent metrics status: 200"
-  #   last:  2026-09，latest/stable 已经是 1.63.0-9（snap revision 134，
-  #          2026-09-22 发布），替代了原先 pin 的 1.61.0-6（revision 125），
-  #          于是换 pin；解包布局不变，agent 与 gomon 仍是 aarch64 静态 ELF。
-  #          monitoring.log 里那每分钟一条 "Sent metrics status: 200" 要等
-  #          switch 到这一代之后才能复核
+  #   last:  2026-10，latest/stable 仍是 1.63.0-9（snap revision 134，
+  #          2026-09-22 发布），无需换 pin。该版本已在运行，agent.log 里
+  #          每分钟一条 "Sent metrics status: 200"，上报正常
   version = "1.63.0-9";
   revision = "134";
 
