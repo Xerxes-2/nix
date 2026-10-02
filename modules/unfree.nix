@@ -18,6 +18,8 @@
       "wechat"
       # Mac mini 的 BCM4331 Wi‑Fi 闭源驱动（wl）；见 hosts/macmini/hardware.nix。
       "broadcom-sta"
+      # b43 实验用的固件（b43-ht 分支）；见 hosts/macmini/wifi-re.nix。
+      "b43-firmware"
       # 以下为 darwin 侧 GUI 应用：
       # BUSL 许可证的 ZeroTier 客户端；压缩工具 Keka。
       "zerotierone"
