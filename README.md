@@ -29,7 +29,7 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 ## 结构
 
 ```
-├── flake.nix               # 入口：定义 oci / asahi / XueMacBook-Pro
+├── flake.nix               # 入口：定义 oci / asahi / macmini / XueMacBook-Pro
 ├── hosts/oci/
 │   ├── configuration.nix   # NixOS 入口，imports 下面的模块
 │   ├── boot.nix filesystems.nix network.nix users.nix packages.nix
@@ -50,6 +50,10 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 │   ├── niri/               # config.kdl + 软件夜间模式补丁（见 gui.nix 的注释）
 │   ├── home.nix            # xerxes2 用户的 Home Manager，含 noctalia 的 config.toml
 │   └── steam/              # Fedora Asahi 游戏栈容器（FEX + muvm），见其 README
+├── hosts/macmini/          # Mac mini Mid 2011 Server，无头，见「Mac mini」
+│   ├── configuration.nix   # 网络 / ssh / 用户 / nix
+│   ├── hardware.nix        # 引导、驱动（wl Wi‑Fi）、bcachefs 池
+│   └── home.nix
 ├── hosts/darwin/
 │   ├── configuration.nix   # nix-darwin 入口：GUI 应用、字体、homebrew、defaults
 │   └── home.nix            # xerxes2 用户的 Home Manager（fish/starship/git/gpg…）
@@ -173,6 +177,29 @@ sudo darwin-rebuild switch --flake ~/.config/nix
 
 > 在 NixOS 上用 `sudo` 时 `~` 会展开成 `/root`，写绝对路径 `/etc/nixos`；
 > macOS 的 sudo 保留用户的 `$HOME`，`~/.config/nix` 没问题。
+
+## Mac mini
+
+Mac mini Mid 2011 Server（Macmini5,3，DMI 型号为准，不是 2012），无头，只走 ssh：
+`ssh xerxes2@macmini.local`（avahi）。不在本机构建，从 x86_64 机器（cachyos）推：
+
+```bash
+nixos-rebuild switch --flake .#macmini --target-host xerxes2@macmini.local --sudo
+```
+
+本机构建的路径没有签名，远端会拒收（`lacks a signature by a trusted key`），
+手动推时用 `nix copy --no-check-sigs --to ssh-ng://xerxes2@macmini.local <path>`。
+
+这台机器的坑：
+- **GRUB 黑屏**：Apple 固件上 GRUB 加载内核后一行字都没有，nomodeset 也没用。
+  正式系统用 systemd-boot（EFI）没问题；装机 U 盘要在 rEFInd 里启动。
+- **bcachefs**：6.18 起移出主线，是 nixpkgs 编的树外模块，所以内核跟 `linuxPackages`
+  不追 latest。根是 SSD+机械盘两设备分层池，数据只一份，坏一块盘会丢数据。
+  开机 dmesg 里的 `error reading superblock: EBUSY` 是 udev 规则重复上线设备，无害。
+- **Wi‑Fi** 用闭源 `wl`（b43 在这块 BCM4331 上只有 2.4GHz）。`wl` 是 nixpkgs 标
+  insecure 的停维驱动，开机必有一条 `Unpatched return thunk` 警告；升级内核时它
+  最容易编译失败，见 `hardware.nix` 的 TODO。
+- Wi‑Fi 密码不进仓库，在机器上 `nmtui` 配。
 
 ## 在另一台机器上同步
 

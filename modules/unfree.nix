@@ -16,6 +16,8 @@
       "oracle-cloud-agent"
       # 腾讯官方 Linux 原生版微信；见 hosts/asahi/gui.nix。
       "wechat"
+      # Mac mini 的 BCM4331 Wi‑Fi 闭源驱动（wl）；见 hosts/macmini/hardware.nix。
+      "broadcom-sta"
       # 以下为 darwin 侧 GUI 应用：
       # BUSL 许可证的 ZeroTier 客户端；压缩工具 Keka。
       "zerotierone"

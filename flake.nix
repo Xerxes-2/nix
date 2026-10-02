@@ -125,6 +125,18 @@
         ];
       };
 
+      # Mac mini Mid 2011 Server（x86_64）：家里的无头折腾机，bcachefs 分层池。
+      nixosConfigurations.macmini = nixpkgs-unstable.lib.nixosSystem {
+        system = "x86_64-linux";
+        specialArgs = { inherit inputs; };
+        modules = [
+          home-manager.nixosModules.home-manager
+          ./modules/unfree.nix
+          ./hosts/macmini/configuration.nix
+          ./hosts/macmini/home.nix
+        ];
+      };
+
       # MacBook（Apple Silicon，Determinate Nix）：macOS 侧，nix-darwin 接管，
       # Home Manager 作为其模块运行（曾是 standalone home-manager 入口）。
       # 使用：sudo darwin-rebuild switch --flake ~/.config/nix
