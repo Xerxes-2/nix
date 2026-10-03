@@ -17,7 +17,9 @@
   # 所以不用 GRUB，改 systemd-boot：和 rEFInd 一样直接把内核当 EFI 程序启动。
   boot.loader.systemd-boot = {
     enable = true;
-    configurationLimit = 10;
+    # 每个 initrd 约 62 MB，10 个版本（加上特化项各一份）会把 1 GB 的 ESP 写满，
+    # 写满后装引导失败，新版本根本进不了启动菜单。
+    configurationLimit = 5;
   };
   # 安装时是从 BIOS 兼容模式启动的 U 盘装的，碰不到 EFI 变量；
   # Apple 固件也不依赖 NVRAM 启动项，没有 macOS 时会自己找 EFI/BOOT/BOOTX64.EFI
