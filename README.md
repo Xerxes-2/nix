@@ -52,7 +52,8 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 │   └── steam/              # Fedora Asahi 游戏栈容器（FEX + muvm），见其 README
 ├── hosts/macmini/          # Mac mini Mid 2011 Server，无头，见「Mac mini」
 │   ├── configuration.nix   # 网络 / ssh / 用户 / nix
-│   ├── hardware.nix        # 引导、驱动（wl Wi‑Fi）、bcachefs 池
+│   ├── hardware.nix        # 引导、驱动（b43-ht Wi‑Fi，wl 备用启动项）、bcachefs 池
+│   ├── wifi-re.nix         # mmiotrace 启动项（抓 wl 的寄存器访问）
 │   └── home.nix
 ├── hosts/darwin/
 │   ├── configuration.nix   # nix-darwin 入口：GUI 应用、字体、homebrew、defaults
@@ -196,9 +197,11 @@ nixos-rebuild switch --flake .#macmini --target-host xerxes2@macmini.local --sud
 - **bcachefs**：6.18 起移出主线，是 nixpkgs 编的树外模块，所以内核跟 `linuxPackages`
   不追 latest。根是 SSD+机械盘两设备分层池，数据只一份，坏一块盘会丢数据。
   开机 dmesg 里的 `error reading superblock: EBUSY` 是 udev 规则重复上线设备，无害。
-- **Wi‑Fi** 用闭源 `wl`（b43 在这块 BCM4331 上只有 2.4GHz）。`wl` 是 nixpkgs 标
-  insecure 的停维驱动，开机必有一条 `Unpatched return thunk` 警告；升级内核时它
-  最容易编译失败，见 `hardware.nix` 的 TODO。
+- **Wi‑Fi** 用自己补的 b43（[b43-ht](https://github.com/Xerxes-2/b43-ht)，flake input），
+  主线 b43 在这块 BCM4331 上只有 2.4GHz。网卡名 `wlp3s0b1`。出问题开机选 "wl" 启动项回到
+  闭源 `wl`（停维、nixpkgs 标 insecure，开机有 `Unpatched return thunk` 警告；升级内核时
+  最容易编译失败，见 `hardware.nix` 的 TODO）。改补丁：在 b43-ht 仓库里改，
+  `nix flake update b43-ht` 后部署；本地试验可 `--override-input b43-ht path:...`。
 - Wi‑Fi 密码不进仓库，在机器上 `nmtui` 配。
 - **ESP 只有 1 GB**，后面的 bcachefs 分区不能缩，扩不了。靠 initrd 瘦身（只留本机微码、
   bcachefs 模块去调试信息，62→34 MB）加 `configurationLimit = 5` 控制占用。

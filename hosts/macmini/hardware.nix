@@ -41,10 +41,7 @@
     "sd_mod"
     "sdhci_pci"
   ];
-  boot.kernelModules = [
-    "kvm-intel"
-    "wl" # Wi‑Fi，见下方「驱动」
-  ];
+  boot.kernelModules = [ "kvm-intel" ];
   boot.initrd.systemd.enable = true;
 
   # 不追 linuxPackages_latest：bcachefs 已移出主线（6.18 起），现在是 nixpkgs
@@ -80,26 +77,38 @@
         iucode_tool -tr ${pkgs.microcode-intel}/intel-ucode.img -s 0x206a7 \
           --write-earlyfw=$out/intel-ucode.img
       '';
-  # Wi‑Fi BCM4331 用闭源 broadcom_sta（wl）而不是主线 b43：这块卡是 HT PHY，
-  # b43 在 HT PHY 上只实现了 2.4GHz、11n 也不完整（dmesg: "5 GHz band is
-  # unsupported on this PHY"），而机器网口要让给别的设备，Wi‑Fi 得当主力。
-  # 代价：wl 上游停维，nixpkgs 标 insecure（CVE-2019-9501/9502，收包堆溢出，
-  # 同一无线环境内可远程利用）。接受这个风险，见下方 allowInsecurePredicate。
-  # 换回 b43：删掉下面这段，hardware.firmware = [ pkgs.b43Firmware_5_1_138 ]，
-  # unfree 白名单把 broadcom-sta 换回 b43-firmware。
-  # 注意 wl 下网卡名会变（wlp3s0b1 → wlp3s0），NM 连接不要绑 interface-name。
-  boot.extraModulePackages = [ config.boot.kernelPackages.broadcom_sta ];
-  # b43/bcma 会先抢这块卡，wl 就绑不上；ssb/brcmsmac 同为竞争驱动。
-  boot.blacklistedKernelModules = [
-    "b43"
-    "bcma"
-    "ssb"
-    "brcmsmac"
-  ];
+  # Wi‑Fi BCM4331：主线 b43 在这块 HT PHY 上只有 2.4GHz、没有 11n，所以用自己补的
+  # b43-ht（github.com/Xerxes-2/b43-ht，flake input）：5GHz、11n、40 MHz，近距离吞吐
+  # 与闭源 wl 持平。模块只编 b43.ko 放进 updates/ 覆盖主线版本；顺带关掉 NM 扫描
+  # 随机 MAC（mac80211 不能在线改 MAC，NM 每次连接前关开接口会让扫描失败）。
+  # debug 版带 debugfs（restart、shm/mmio 读写），出问题时好查。
+  hardware.b43-ht = {
+    enable = true;
+    debug = true;
+  };
+
+  # 备用：开机选 "wl" 启动项回到闭源 broadcom_sta。b43-ht 观察一段时间没问题就删掉
+  # 这个启动项、insecure 白名单和 unfree 白名单里的 broadcom-sta。
+  # wl 是停维驱动，nixpkgs 标 insecure（CVE-2019-9501/9502，收包堆溢出，同一无线环境
+  # 内可远程利用）。注意 wl 下网卡名不同（wlp3s0 而不是 wlp3s0b1），NM 连接不要绑
+  # interface-name。
+  specialisation.wl.configuration = {
+    system.nixos.tags = [ "wl" ];
+    hardware.b43-ht.enable = lib.mkForce false;
+    boot.extraModulePackages = [ config.boot.kernelPackages.broadcom_sta ];
+    boot.kernelModules = [ "wl" ];
+    # b43/bcma 会先抢这块卡，wl 就绑不上；ssb/brcmsmac 同为竞争驱动。
+    boot.blacklistedKernelModules = [
+      "b43"
+      "bcma"
+      "ssb"
+      "brcmsmac"
+    ];
+  };
   # 只放行这一个包，按 pname 匹配（name 里带内核版本，换内核会变）。
   # TODO revisit: 升级 nixpkgs/内核后
   #   check: nix build .#nixosConfigurations.macmini.config.system.build.toplevel
-  #   then:  broadcom-sta 编译失败就固定较旧 LTS 内核，或改插主线驱动的 USB 网卡
+  #   then:  broadcom-sta 编译失败就删掉 wl 启动项（b43-ht 已是日常驱动）
   #   last:  2026-10, broadcom-sta 6.30.223.271-63 + 内核 6.18.54
   nixpkgs.config.allowInsecurePredicate = pkg: lib.getName pkg == "broadcom-sta";
 

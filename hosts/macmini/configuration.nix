@@ -2,7 +2,10 @@
 # 2026-10 从 U 盘（BIOS 兼容模式启动的 NixOS minimal ISO）nixos-install 装上。
 { pkgs, ... }:
 {
-  imports = [ ./hardware.nix ];
+  imports = [
+    ./hardware.nix
+    ./wifi-re.nix
+  ];
 
   networking.hostName = "macmini";
   # Wi‑Fi 密码不进仓库：安装时把 U 盘系统里 nmtui 连好的

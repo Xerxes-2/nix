@@ -16,6 +16,11 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
       inputs.home-manager.follows = "home-manager";
     };
+    # Mac mini 的 BCM4331 用的 b43 补丁（5GHz、11n）；见 hosts/macmini/hardware.nix。
+    b43-ht = {
+      url = "github:Xerxes-2/b43-ht";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
     home-manager = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
@@ -131,6 +136,7 @@
         specialArgs = { inherit inputs; };
         modules = [
           home-manager.nixosModules.home-manager
+          inputs.b43-ht.nixosModules.default
           ./modules/unfree.nix
           ./hosts/macmini/configuration.nix
           ./hosts/macmini/home.nix

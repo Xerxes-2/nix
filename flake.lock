@@ -13,6 +13,26 @@
         "type": "path"
       }
     },
+    "b43-ht": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs-unstable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791071045,
+        "narHash": "sha256-rZqHr595BwikLyyCLCXRqelYSn3GQ0itjZCNTVbtCFc=",
+        "owner": "Xerxes-2",
+        "repo": "b43-ht",
+        "rev": "1b5ea18d930d3fefdf669b77214d55ee190c48be",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Xerxes-2",
+        "repo": "b43-ht",
+        "type": "github"
+      }
+    },
     "bdwgc": {
       "flake": false,
       "locked": {
@@ -333,6 +353,7 @@
     "root": {
       "inputs": {
         "asahi-firmware": "asahi-firmware",
+        "b43-ht": "b43-ht",
         "chive": "chive",
         "determinate": "determinate",
         "home-manager": "home-manager",
