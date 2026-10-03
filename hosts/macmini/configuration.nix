@@ -34,7 +34,7 @@
 
   users.users.xerxes2 = {
     isNormalUser = true;
-    shell = pkgs.fish;
+    # 不设 fish：这台几乎只被脚本 ssh 进来执行命令，bash 语法省得每条再包一层。
     extraGroups = [
       "wheel"
       "networkmanager"
@@ -49,7 +49,36 @@
   # 没接 sops、也没设登录密码：账户只能用 ssh key 进。sudo 免密是这台
   # 折腾机的取舍——不像 oci 那样对公网提供服务，不值得为第二道关维护一份密码哈希。
   security.sudo.wheelNeedsPassword = false;
-  programs.fish.enable = true;
+
+  # ===== 远程调试 =====
+  # 没有串口：内核日志经直连网线（enp2s0f0 ↔ 工作站 enp10s0，IPv6 链路本地）
+  # 用 netconsole 发到工作站 UDP 6666，死机前最后的日志也能收到。
+  # 工作站收：socat -u UDP6-RECV:6666 -（地址是工作站 NM 生成的 stable-privacy
+  # 链路本地地址，工作站重建 macmini-direct 连接后要更新）。
+  # 等网卡改完名再加载（参数里按名字找设备），所以不放 boot.kernelModules。
+  boot.extraModprobeConfig = ''
+    options netconsole netconsole=+6665@fe80::ca2a:14ff:fe55:20c5/enp2s0f0,6666@fe80::9ae5:4aab:9f1e:f0c2/34:5a:60:c5:f6:1f
+  '';
+  systemd.services.netconsole = {
+    description = "netconsole to workstation";
+    wantedBy = [ "multi-user.target" ];
+    bindsTo = [ "sys-subsystem-net-devices-enp2s0f0.device" ];
+    after = [ "sys-subsystem-net-devices-enp2s0f0.device" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${pkgs.kmod}/bin/modprobe netconsole";
+      ExecStop = "${pkgs.kmod}/bin/modprobe -r netconsole";
+    };
+  };
+  # netconsole 只发 console_loglevel 以上的；默认 4 连 WARN 都不发。7 = info 及以上，
+  # 要 debug 级（b43dbg）临时 `dmesg -n 8`。
+  boot.consoleLogLevel = 7;
+  # 驱动实验出 oops 就直接 panic、10 秒后重启，不留半死的机器（没人能去按电源）。
+  boot.kernel.sysctl = {
+    "kernel.panic_on_oops" = 1;
+    "kernel.panic" = 10;
+  };
 
   nix.settings = {
     experimental-features = [

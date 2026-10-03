@@ -200,6 +200,13 @@ nixos-rebuild switch --flake .#macmini --target-host xerxes2@macmini.local --sud
   insecure 的停维驱动，开机必有一条 `Unpatched return thunk` 警告；升级内核时它
   最容易编译失败，见 `hardware.nix` 的 TODO。
 - Wi‑Fi 密码不进仓库，在机器上 `nmtui` 配。
+- **ESP 只有 1 GB**，后面的 bcachefs 分区不能缩，扩不了。靠 initrd 瘦身（只留本机微码、
+  bcachefs 模块去调试信息，62→34 MB）加 `configurationLimit = 5` 控制占用。
+- **没有串口**：内核日志用 netconsole 经直连网线发到 cachyos 的 UDP 6666（地址写死在
+  `configuration.nix`）。cachyos 上由用户服务 `macmini-netconsole` 存到
+  `~/Dev/b43-re/netconsole.log`，防火墙要放行 `enp10s0` 的 udp 6666。oops 即 panic，
+  10 秒后自动重启。
+- 登录 shell 是 bash（几乎只被脚本 ssh 进来执行命令）。
 
 ## 在另一台机器上同步
 

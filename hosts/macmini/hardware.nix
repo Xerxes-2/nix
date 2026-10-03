@@ -17,7 +17,8 @@
   # 所以不用 GRUB，改 systemd-boot：和 rEFInd 一样直接把内核当 EFI 程序启动。
   boot.loader.systemd-boot = {
     enable = true;
-    # 每个 initrd 约 62 MB，10 个版本（加上特化项各一份）会把 1 GB 的 ESP 写满，
+    # ESP 只有 1 GB，后面的 bcachefs 成员分区又不能缩（"Cannot shrink yet"），
+    # 只能控制每个版本占的空间：initrd 瘦身见下方微码和 bcachefs 模块。
     # 写满后装引导失败，新版本根本进不了启动菜单。
     configurationLimit = 5;
   };
@@ -54,11 +55,31 @@
   #   then:  bcachefs 模块编译失败就固定到它支持的较旧 LTS（linuxPackages_6_12 等）
   #   last:  2026-10, nixpkgs c59305b：内核 6.18.54 + bcachefs 1.39.6 正常
   boot.kernelPackages = pkgs.linuxPackages;
+  # 树外 bcachefs 模块装的时候没去调试信息：initrd 里它压缩后还有 14 MB
+  # （解压 86 MB），去掉后 1.2 MB。
+  # TODO revisit: 升级 nixpkgs 后
+  #   check: grep INSTALL_MOD_STRIP pkgs/by-name/bc/bcachefs-tools/kernel-module.nix
+  #   then:  上游加了就删掉这段
+  #   last:  2026-10, nixpkgs c59305b：没加
+  boot.bcachefs.modulePackage =
+    (config.boot.kernelPackages.callPackage config.boot.bcachefs.package.kernelModule { }).overrideAttrs
+      (o: {
+        makeFlags = o.makeFlags ++ [ "INSTALL_MOD_STRIP=1" ];
+      });
 
   # ===== 驱动 =====
   # tg3（有线 BCM57765）需要 linux-firmware 里的 tigon 固件。
   hardware.enableRedistributableFirmware = true;
   hardware.cpu.intel.updateMicrocode = true;
+  # 默认把全部 Intel 微码（15 MB，不压缩）放进每个 initrd；只留本机 CPU
+  # （i7-2635QM，签名 0x206a7）的那一份，约 13 KB。
+  hardware.cpu.intel.microcodePackage =
+    pkgs.runCommand "microcode-intel-206a7" { nativeBuildInputs = [ pkgs.iucode-tool ]; }
+      ''
+        mkdir $out
+        iucode_tool -tr ${pkgs.microcode-intel}/intel-ucode.img -s 0x206a7 \
+          --write-earlyfw=$out/intel-ucode.img
+      '';
   # Wi‑Fi BCM4331 用闭源 broadcom_sta（wl）而不是主线 b43：这块卡是 HT PHY，
   # b43 在 HT PHY 上只实现了 2.4GHz、11n 也不完整（dmesg: "5 GHz band is
   # unsupported on this PHY"），而机器网口要让给别的设备，Wi‑Fi 得当主力。
