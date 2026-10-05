@@ -509,6 +509,23 @@ asahi 在 `hosts/asahi/configuration.nix`（系统级 `ssh_config`，不动没�
 **新文件必须先让 jj 快照到，否则 nix 看不见**（报 `Path '...' is not tracked by
 Git`）。跑一条 `jj st` 即可，原理见 `AGENTS.md`。
 
+**oci 那块独立的 ext4 /boot（sda16，923M）是 Ubuntu 云镜像的遗留，下次装机别沿用。**
+OCI 的 Ubuntu 镜像自带「98M ESP + ext4 /boot + 根」三分区，oci 是在它上面装的 NixOS，
+于是 ESP 太小 → 只能用 GRUB → 内核拷进 /boot → /boot 一满就得卡 `configurationLimit`。
+事后想把 sda16 并回根分区不划算：它夹在 ESP 和根分区中间，根分区起点前移等于把整个
+btrfs 往前搬一遍（btrfs 记的是相对设备起点的物理偏移），为 0.6% 的空间不值得，就这样留着。
+下次（nixos-anywhere / disko）整盘重分区，只要两个分区：
+
+- ESP（vfat，几十到 100M）：只放 GRUB 自己的 `EFI/BOOT/BOOTAA64.EFI`；
+- 其余整块 btrfs：/boot 就是 `@` 里的普通目录（或单独一个 `@boot` 子卷）。
+
+这能成立的前提：GRUB ≥ 2.04 才读得了 zstd 压缩；NixOS 的 `install-grub.pl` 会用
+`btrfs subvol show` 把子卷路径算进 grub.cfg，`/nix` 在 `@nix` 里也找得到；
+`boot.loader.grub.copyKernels` 保持默认 false，/boot 和 store 同在一个 fs 时 GRUB
+直接从 store 读内核，/boot 里只剩 grub.cfg，不会再满。代价：btrfs 上 GRUB 写不了
+grubenv（`default = "saved"` 之类不能用）；要加密 /boot 的话 GRUB 只稳定支持 LUKS1
+或 PBKDF2 的 LUKS2，不支持 argon2。
+
 **btrfs 的压缩挂载选项是整个文件系统的属性，不是子卷的。** 同一个设备上所有挂载
 点的 `compress-force=` 必须写成一样，否则实际生效的是最后挂上的那份。两台机器都用
 `btrfsOpts` / 共享列表来保证这一点。
