@@ -208,9 +208,12 @@ nixos-rebuild switch --flake .#macmini --target-host xerxes2@macmini.local --sud
   IPv4 DHCP、IPv6 auto（原 `direct` 连接已改名，不再仅链路本地）。连接配置保存在机器上，
   换机时需重建；插路由器 LAN 口后可用 `ssh xerxes2@macmini.local`，或在路由器查 DHCP 地址。
   有线管理链路验证正常后，默认启动项已从 wl 改回 b43，wl 仍保留作回退。
-  b43 的 EF/SSH 丢包已通过共享 BE 发送队列规避，并已重启验证；HT40 保留。
-  所有 AC 使用 BE 硬件竞争，AP/mesh 在此模式下禁用；满载延迟、拥塞扫描和 PHY 错误
-  仍需优化，驱动调试应使用有线地址连接。
+  b43 的 EF/SSH 丢包已通过共享 BE 发送队列规避，HT40 保留；BCM4331 HT TX
+  初始化通过 PCI API 请求 MRRS 512，避免 128 字节读请求造成的大量 TX FIFO 下溢。
+  自适应聚合限长保留作平台受限时的兜底。已验证冷启动自动设置 512、重连、控制器
+  重启，以及 10 分钟持续 TX（平均约 168 Mbps、无下溢）；系统休眠恢复尚未实测。
+  所有 AC 使用 BE 硬件竞争，AP/mesh 在此模式下禁用；混合优先级满载延迟和拥塞
+  扫描仍需复查，驱动调试应使用有线地址连接。
   迁到局域网后，下面按直连地址配置的 netconsole 不再保证可达，需另行更新目标地址。
 - **ESP 只有 1 GB**，后面的 bcachefs 分区不能缩，扩不了。靠 initrd 瘦身（只留本机微码、
   bcachefs 模块去调试信息，62→34 MB）加 `configurationLimit = 5` 控制占用。
