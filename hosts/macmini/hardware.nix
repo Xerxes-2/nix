@@ -85,6 +85,10 @@
   hardware.b43-ht = {
     enable = true;
     debug = true;
+    # RX 和 TX 状态走 NAPI + GRO：TCP RX 约 200 → 235 Mbps（wl 约 210）。
+    # 默认关闭的选项；出问题时删掉这一行即回到 IRQ 线程直接上交。
+    # TODO revisit：BA 会话 drain/epoch 尚未处理，长期观察后再决定是否保留。
+    extraOptions = [ "htphy_napi=1" ];
   };
 
   # 备用：开机选 "wl" 启动项回到闭源 broadcom_sta。b43-ht 观察一段时间没问题就删掉
