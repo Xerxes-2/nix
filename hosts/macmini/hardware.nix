@@ -77,6 +77,22 @@
         iucode_tool -tr ${pkgs.microcode-intel}/intel-ucode.img -s 0x206a7 \
           --write-earlyfw=$out/intel-ucode.img
       '';
+  # 散热：Wi‑Fi 满载（单核忙）时 SMC 风扇从 2300 rpm 起步太慢，核心冲到
+  # 100°C 并触发降频，开满 5500 rpm 也压不住；2026-10-07 疑似一次过热断电。
+  # 风扇下限提到 4000 rpm 后同样负载稳定在约 70°C，吞吐不变。
+  # TODO revisit：清灰换硅脂后复测，散热恢复就删掉。
+  systemd.services.macmini-fan-min = {
+    description = "Raise the SMC fan minimum until the cooling is serviced";
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig.Type = "oneshot";
+    script = ''
+      for i in $(seq 1 30); do
+        [ -w /sys/devices/platform/applesmc.768/fan1_min ] && break
+        sleep 1
+      done
+      echo 4000 > /sys/devices/platform/applesmc.768/fan1_min
+    '';
+  };
   # Wi‑Fi BCM4331：主线 b43 在这块 HT PHY 上只有 2.4GHz、没有 11n，所以用自己补的
   # b43-ht（github.com/Xerxes-2/b43-ht，flake input）：5GHz、11n、40 MHz，近距离吞吐
   # 与闭源 wl 持平。模块只编 b43.ko 放进 updates/ 覆盖主线版本；顺带关掉 NM 扫描
