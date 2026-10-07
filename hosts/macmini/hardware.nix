@@ -79,10 +79,12 @@
       '';
   # 散热：Wi‑Fi 满载（单核忙）时 SMC 风扇从 2300 rpm 起步太慢，核心冲到
   # 100°C 并触发降频，开满 5500 rpm 也压不住；2026-10-07 疑似一次过热断电。
-  # 风扇下限提到 4000 rpm 后同样负载稳定在约 70°C，吞吐不变。
+  # 只提风扇下限到 4000 rpm：短测约 70°C，但 2 小时混合长测仍有约 30 分钟
+  # 在 95–100°C 降频。再关掉睿频：Wi‑Fi 满载最高 76°C，TCP RX 231、TX 165
+  # Mbit/s，与长测中降频后的吞吐相同。
   # TODO revisit：清灰换硅脂后复测，散热恢复就删掉。
   systemd.services.macmini-fan-min = {
-    description = "Raise the SMC fan minimum until the cooling is serviced";
+    description = "Raise the SMC fan minimum and disable turbo until the cooling is serviced";
     wantedBy = [ "multi-user.target" ];
     serviceConfig.Type = "oneshot";
     script = ''
@@ -91,6 +93,7 @@
         sleep 1
       done
       echo 4000 > /sys/devices/platform/applesmc.768/fan1_min
+      echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo
     '';
   };
   # Wi‑Fi BCM4331：主线 b43 在这块 HT PHY 上只有 2.4GHz、没有 11n，所以用自己补的
