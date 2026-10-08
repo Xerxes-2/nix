@@ -44,7 +44,11 @@ in
   # 模块以 XDG_DATA_HOME=/var/lib 运行全局模式，数据在 /var/lib/SillyTavern/data，
   # 第三方扩展在 /var/lib/SillyTavern/extensions（BindPaths 映射进包目录）。
   # config 无机密（basicAuth/proxy 均为未启用的出厂默认），直接进 git；
-  # 监听 127.0.0.1:8000（listen: false）+ whitelist，cloudflared 走 localhost。
+  # 监听 127.0.0.1:8000（listen: false），cloudflared 走 localhost，隧道域名前面套
+  # Cloudflare Access 只放自己（dashboard 里的 public hostname → http://localhost:8000）。
+  # 不用 ST 自带的两层认证：whitelist 在同机代理下没有意义（对端全是 127.0.0.1，
+  # 而开启 forwarded whitelist 又要求把动态出口 IP 列进去），basicAuth 则会把密码
+  # 明文写进这份进 git 的 yaml，而且它只在 listen: true 时才装载（server-main.js）。
   services.sillytavern = {
     enable = true;
     # 注意：必须插值成 string，模块把它直接传给 tmpfiles 的 L+ argument（要求 string）

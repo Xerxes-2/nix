@@ -437,6 +437,20 @@ chive backtest --strategy breakout \
 
 ## SillyTavern 的 Claude 订阅登录插件
 
+**访问方式**：ST 只监听 `127.0.0.1:8000`（`listen: false`），经 cloudflared 隧道暴露
+（dashboard 里的 public hostname → `http://localhost:8000`），隧道域名前面套 Cloudflare Access
+只放自己 —— 和 lazycreep 同一套。所以 `sillytavern.yaml` 里 **`whitelistMode: false`**：
+cloudflared 与 ST 同机，对端永远是 `127.0.0.1`，白名单在这里要么形同虚设（`whitelist.js`
+只查对端的话全放行），要么变成负担（`enableForwardedWhitelist: true` 时要求对端和转发出的
+客户端 IP **都**在表里，而出口 IP 是动态的）——这就是那句 `Connection from 127.0.0.1
+(forwarded from …) has been blocked` 的来历。`basicAuthMode` 同样不用：它会把密码明文写进
+这份进 git 的 yaml，而且只在 `listen: true` 时才装载（`server-main.js`）。
+
+```bash
+curl -sI https://<隧道域名>/ | head -1   # 期望 302 到 cloudflareaccess.com，而不是 ST 的 403
+journalctl -u sillytavern | grep -i blocked   # 改完不该再有输出
+```
+
 `hosts/oci/services/sillytavern.nix`。服务端插件来自自己的仓库
 [sillytavern-claude-oauth](https://github.com/Xerxes-2/sillytavern-claude-oauth)（flake input，
 `flake = false`），在 nix 里用 pnpm 锁文件装好 node_modules 后整个进 store，

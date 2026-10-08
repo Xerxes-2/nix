@@ -20,7 +20,12 @@ ssl:
   certPath: ./certs/cert.pem
   keyPath: ./certs/privkey.pem
   keyPassphrase: ""
-whitelistMode: true
+# whitelistMode 保持关闭：公开入口是 CF tunnel，cloudflared 与 ST 同机，请求的 TCP 对端
+# 永远是 127.0.0.1；同机代理下白名单要么形同虚设（enableForwardedWhitelist: false 时
+# 只查对端，全放行），要么变成维护负担（enableForwardedWhitelist: true 时 whitelist.js
+# 要求对端和转发出来的客户端 IP 都在表里，而出口 IP 是动态的）。认证交给隧道前的
+# Cloudflare Access —— 和 lazycreep 同一套做法，见 hosts/oci/services/sillytavern.nix。
+whitelistMode: false
 enableForwardedWhitelist: true
 whitelist:
   - ::1
