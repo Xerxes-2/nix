@@ -77,13 +77,25 @@
         iucode_tool -tr ${pkgs.microcode-intel}/intel-ucode.img -s 0x206a7 \
           --write-earlyfw=$out/intel-ucode.img
       '';
-  # 散热：Wi‑Fi 满载（单核忙）时睿频把核心推到 100°C 并降频，SMC 风扇
-  # 到 97°C 左右才开始加速，开满 5500 rpm 也压不住；2026-10-07 疑似一次
-  # 过热断电。2026-10-08 换硅脂后只略有改善（到 100°C 从约 1.7 分钟变成
-  # 2.3 分钟），风扇下限 4000 rpm 加睿频仍到 100°C。关掉睿频、风扇保持默认：
-  # 5 分钟 TCP RX 最高 90°C、不降频，吞吐不变（RX 232 Mbit/s）。
-  # TODO revisit：散热器重新安装或更换后，开回睿频复测。
+  # 散热：这台 2011 i7 散热余量很小（RAPL 实测睿频开时 Wi‑Fi 满载单核约
+  # 20 W 封装功耗就到 100°C 降频；2026-10-07 疑似一次过热断电，换硅脂、
+  # 弹簧螺丝拧到底后只略有改善）。常驻关睿频：同负载 11.7 W、最高 83°C，
+  # 吞吐不变。空闲约 68°C。
   powerManagement.powerUpCommands = "echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo";
+  # SMC 自带曲线要到约 97°C 才给风扇加速。mbpfan 默认 55–78°C 在这台机器
+  # 空闲（约 68°C）时就会一直转，阈值整体上移：72°C 以下保持最低 2300 rpm，
+  # 75°C 起按平方曲线加速，90°C 满速。实测 10 分钟 Wi‑Fi TCP RX：稳定在
+  # 约 4000 rpm / 83°C；TX 不加速（2300 rpm / 72–75°C）。对比 74/78/95：
+  # 约 3600 rpm / 88°C；为夏天留余量选前者。
+  services.mbpfan = {
+    enable = true;
+    aggressive = false;
+    settings.general = {
+      low_temp = 72;
+      high_temp = 75;
+      max_temp = 90;
+    };
+  };
   # Wi‑Fi BCM4331：主线 b43 在这块 HT PHY 上只有 2.4GHz、没有 11n，所以用自己补的
   # b43-ht（github.com/Xerxes-2/b43-ht，flake input）：5GHz、11n、40 MHz，近距离吞吐
   # 与闭源 wl 持平。模块只编 b43.ko 放进 updates/ 覆盖主线版本；顺带关掉 NM 扫描
