@@ -33,7 +33,7 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 ├── hosts/oci/
 │   ├── configuration.nix   # NixOS 入口，imports 下面的模块
 │   ├── boot.nix filesystems.nix network.nix users.nix packages.nix
-│   ├── services/           # wakapi / sillytavern / vaultwarden / ntfy / restic / cloudflared / chive / oracle-cloud-agent / misc
+│   ├── services/           # wakapi / sillytavern / vaultwarden / ntfy / restic / cloudflared / chive / lazycreep / oracle-cloud-agent / misc
 │   ├── home.nix            # ubuntu 用户的 Home Manager（含 dufs）
 │   ├── sillytavern.yaml    # SillyTavern 配置（无机密，进 git）
 │   └── chive.toml          # chive 虚拟仓配置（无机密，进 git）

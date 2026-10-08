@@ -17,6 +17,7 @@
     ./services/vaultwarden.nix
     ./services/ntfy.nix
     ./services/chive.nix
+    ./services/lazycreep.nix
     ./services/oracle-cloud-agent.nix
     ./services/misc.nix
   ];

@@ -57,6 +57,10 @@
     # SillyTavern 的 Claude 订阅登录插件（自己的仓库，不是 flake，只当源码用）。
     # 打包和挂载在 hosts/oci/services/sillytavern.nix。更新它就是 flake update
     # 这一个输入；插件零运行时依赖（OAuth 流程打包在 vendor/），不用管 node_modules。
+    # 自己的 Screeps 客户端（Gateway + 前端），oci 上跑，见 hosts/oci/services/lazycreep.nix。
+    # 有意不 follows nixpkgs：前端的 pnpm 依赖按固定输出哈希锁定，哈希跟着它自己锁的 nixpkgs
+    # （pnpm 版本）走；换成这里的 nixpkgs，pnpm 一变哈希就对不上、构建失败。代价是多一份 nixpkgs 源码。
+    lazycreep.url = "github:Xerxes-2/lazycreep";
     sillytavern-claude-oauth = {
       url = "github:Xerxes-2/sillytavern-claude-oauth";
       flake = false;
