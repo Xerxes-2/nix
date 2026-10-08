@@ -77,25 +77,13 @@
         iucode_tool -tr ${pkgs.microcode-intel}/intel-ucode.img -s 0x206a7 \
           --write-earlyfw=$out/intel-ucode.img
       '';
-  # 散热：Wi‑Fi 满载（单核忙）时 SMC 风扇从 2300 rpm 起步太慢，核心冲到
-  # 100°C 并触发降频，开满 5500 rpm 也压不住；2026-10-07 疑似一次过热断电。
-  # 只提风扇下限到 4000 rpm：短测约 70°C，但 2 小时混合长测仍有约 30 分钟
-  # 在 95–100°C 降频。再关掉睿频：Wi‑Fi 满载最高 76°C，TCP RX 231、TX 165
-  # Mbit/s，与长测中降频后的吞吐相同。
-  # TODO revisit：清灰换硅脂后复测，散热恢复就删掉。
-  systemd.services.macmini-fan-min = {
-    description = "Raise the SMC fan minimum and disable turbo until the cooling is serviced";
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig.Type = "oneshot";
-    script = ''
-      for i in $(seq 1 30); do
-        [ -w /sys/devices/platform/applesmc.768/fan1_min ] && break
-        sleep 1
-      done
-      echo 4000 > /sys/devices/platform/applesmc.768/fan1_min
-      echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo
-    '';
-  };
+  # 散热：Wi‑Fi 满载（单核忙）时睿频把核心推到 100°C 并降频，SMC 风扇
+  # 到 97°C 左右才开始加速，开满 5500 rpm 也压不住；2026-10-07 疑似一次
+  # 过热断电。2026-10-08 换硅脂后只略有改善（到 100°C 从约 1.7 分钟变成
+  # 2.3 分钟），风扇下限 4000 rpm 加睿频仍到 100°C。关掉睿频、风扇保持默认：
+  # 5 分钟 TCP RX 最高 90°C、不降频，吞吐不变（RX 232 Mbit/s）。
+  # TODO revisit：散热器重新安装或更换后，开回睿频复测。
+  powerManagement.powerUpCommands = "echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo";
   # Wi‑Fi BCM4331：主线 b43 在这块 HT PHY 上只有 2.4GHz、没有 11n，所以用自己补的
   # b43-ht（github.com/Xerxes-2/b43-ht，flake input）：5GHz、11n、40 MHz，近距离吞吐
   # 与闭源 wl 持平。模块只编 b43.ko 放进 updates/ 覆盖主线版本；顺带关掉 NM 扫描
