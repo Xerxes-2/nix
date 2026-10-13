@@ -7,6 +7,8 @@
 
   home-manager.users.xerxes2 = {
     imports = [ ../../modules/home/cli.nix ];
+    # 这台从 cachyos 远程推，本机没有仓库副本；NH_FLAKE 指过去只会报找不到。
+    programs.nh.flake = null;
     home.stateVersion = "26.11";
   };
 }

@@ -179,6 +179,17 @@ sudo darwin-rebuild switch --flake ~/.config/nix
 > 在 NixOS 上用 `sudo` 时 `~` 会展开成 `/root`，写绝对路径 `/etc/nixos`；
 > macOS 的 sudo 保留用户的 `$HOME`，`~/.config/nix` 没问题。
 
+也可以用 [nh](https://github.com/nix-community/nh)（`modules/home/cli.nix`，所有机器都装了）：
+`NH_FLAKE` 已指向本机仓库，不用带路径，也不用自己加 sudo（需要时 nh 会自己提权），
+切换前还会打出包版本 diff：
+
+```bash
+nh os switch        # NixOS（oci / asahi）
+nh darwin switch    # macOS
+```
+
+macmini 本机没有仓库副本，没设 `NH_FLAKE`，照下面的远程推送方式来。
+
 ## Mac mini
 
 Mac mini Mid 2011 Server（Macmini5,3，DMI 型号为准，不是 2012），无头，只走 ssh：

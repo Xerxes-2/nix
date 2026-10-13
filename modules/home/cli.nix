@@ -1,7 +1,17 @@
 # 跨机器共享的 CLI 工具集（Home Manager 模块，Linux/macOS 通用）。
 # 各 host 的 home.nix 导入此模块，平台特有工具在各自 host 里追加。
-{ pkgs, ... }:
+{ lib, pkgs, ... }:
 {
+  # nh：nixos-rebuild / darwin-rebuild 的前端，自带 nvd 式的版本 diff 和构建树。
+  # flake 写进 NH_FLAKE，`nh os switch` / `nh darwin switch` 不用再带路径；
+  # 仓库在 NixOS 上的位置是 /etc/nixos，darwin 在 hosts/darwin/home.nix 覆盖。
+  # 只用它做 rebuild：nh.clean 不开，定期 GC 仍由各系统的 nix.gc 负责
+  # （NixOS 的 programs.nh.clean 与 nix.gc.automatic 互斥，没必要换）。
+  programs.nh = {
+    enable = true;
+    flake = lib.mkDefault "/etc/nixos";
+  };
+
   # 登录 shell。真正把 fish 设为登录 shell 的是各系统层的
   # `programs.fish.enable`（NixOS 上还有 `users.users.<u>.shell`；darwin 上
   # nix-darwin 的同名选项负责写 /etc/shells 和 vendor 补全）。
