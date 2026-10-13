@@ -3,16 +3,21 @@
 {
   imports = [ inputs.battlesnake.nixosModules.default ];
 
-  # 无状态 HTTP 服务：Battlesnake 引擎每回合 POST /move，回一个方向。
-  # 仅监听本机，经 cloudflared 隧道暴露为 https://snake.xerxes2.com
-  # （Cloudflare dashboard 里的 public hostname → http://localhost:8100）。
-  # 与 lazycreep / ST 不同，前面**不能**套 Cloudflare Access：调用方是 Battlesnake 的
-  # 游戏服务器，过不了登录页。暴露出去也只是个算走法的接口，没有状态、不代理任何东西。
-  # 走隧道而不是直接开端口：TLS 在离引擎（GCP Oregon）最近的 Cloudflare 节点终结，
-  # 跨太平洋的只剩已建好的隧道连接，省掉每回合握手的往返（500ms 超时里网络约占 175ms）。
+  # 无状态 HTTP 服务：Battlesnake 引擎（GCP us-west1）每回合 POST /move，回一个方向，
+  # 超时 500ms 含网络。
+  #
+  # 直连公网 http://152.67.123.41:8100，**不走 cloudflared 隧道**：免费套餐的请求会被
+  # Cloudflare 内部转到 LHR/AMS/BOS 这些远处机房处理（CF-RAY 可见），再进悉尼的隧道，
+  # 实测 cfOrigin 640–1000ms，整回合超时。直连 us-west1 → oci ping 约 165ms。
+  # 纯 HTTP 不上 TLS：没有状态和秘密可保护，TLS 握手却要多付跨太平洋往返。
+  # 隧道的 https://snake.xerxes2.com（→ localhost:8100，不套 Access）留着给自己 curl 调试。
+  #
+  # 除了这里的 NixOS 防火墙，Oracle 控制台 VCN 的 security list 也要放行 TCP 8100。
   services.battlesnake = {
     enable = true;
+    host = "0.0.0.0";
     # 8000 被 SillyTavern 占了
     port = 8100;
+    openFirewall = true;
   };
 }

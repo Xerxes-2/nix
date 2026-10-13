@@ -488,13 +488,17 @@ rebuild，抄报错里的 `got:` 回去。
 
 `hosts/oci/services/battlesnake.nix`，代码在自己的仓库
 [battlesnake](https://github.com/Xerxes-2/battlesnake)（flake input，提供包和 `services.battlesnake` 模块）。
-只监听 `127.0.0.1:8100`，经 cloudflared 隧道暴露为 `https://snake.xerxes2.com`
-（dashboard 里的 public hostname → `http://localhost:8100`）。**不套 Cloudflare Access**：
-调用方是 Battlesnake 的游戏服务器，过不了登录页；服务无状态，暴露出去没有风险。
+
+**Battlesnake 上填的 URL 是直连的 `http://152.67.123.41:8100`**，不是隧道域名：免费套餐的
+Cloudflare 会把请求转到伦敦/阿姆斯特丹等远处机房再进悉尼隧道，实测比直连慢 4–6 倍，
+500ms 超时根本不够（原因和数据见 `battlesnake.nix` 注释）。直连需要两处放行 TCP 8100：
+NixOS 防火墙（模块 `openFirewall`，已声明）和 **Oracle 控制台 VCN 的 security list**（手动）。
+
+隧道 `https://snake.xerxes2.com`（→ `http://localhost:8100`，不套 Access）只留给自己调试。
 
 ```bash
-curl -s https://snake.xerxes2.com/            # 期望返回 {"apiversion":"1",...}
-journalctl -u battlesnake -f                  # 每回合一行 move ... (x ms)
+curl -s http://152.67.123.41:8100/            # 期望返回 {"apiversion":"1",...}
+sudo journalctl -u battlesnake -f             # 每回合一行 move ... (x ms)；DynamicUser 的日志普通用户读不到
 ```
 
 **更新蛇**：在蛇仓库推送后 `nix flake update battlesnake` 再 switch。
