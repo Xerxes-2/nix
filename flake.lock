@@ -33,6 +33,26 @@
         "type": "github"
       }
     },
+    "battlesnake": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs-unstable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791876919,
+        "narHash": "sha256-lquoe2u9qudJAGv2pQKhkMG33G+6pUgQHAU7BLaLqck=",
+        "owner": "Xerxes-2",
+        "repo": "battlesnake",
+        "rev": "7d36050156406637f51fc55ae0dd1d252024e458",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Xerxes-2",
+        "repo": "battlesnake",
+        "type": "github"
+      }
+    },
     "bdwgc": {
       "flake": false,
       "locked": {
@@ -388,6 +408,7 @@
       "inputs": {
         "asahi-firmware": "asahi-firmware",
         "b43-ht": "b43-ht",
+        "battlesnake": "battlesnake",
         "chive": "chive",
         "determinate": "determinate",
         "home-manager": "home-manager",

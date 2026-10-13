@@ -61,6 +61,13 @@
     # 有意不 follows nixpkgs：前端的 pnpm 依赖按固定输出哈希锁定，哈希跟着它自己锁的 nixpkgs
     # （pnpm 版本）走；换成这里的 nixpkgs，pnpm 一变哈希就对不上、构建失败。代价是多一份 nixpkgs 源码。
     lazycreep.url = "github:Xerxes-2/lazycreep";
+    # 自己的 Battlesnake 蛇（F#），oci 上跑，见 hosts/oci/services/battlesnake.nix。
+    # 可以 follows：没有锁哈希的外部依赖（nix/deps.json 为空，FSharp.Core 随 SDK 自带），
+    # 换 nixpkgs 只是换 .NET 10 的补丁版本。更新蛇 = nix flake update battlesnake 再 switch。
+    battlesnake = {
+      url = "github:Xerxes-2/battlesnake";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
     sillytavern-claude-oauth = {
       url = "github:Xerxes-2/sillytavern-claude-oauth";
       flake = false;

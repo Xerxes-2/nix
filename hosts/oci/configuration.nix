@@ -18,6 +18,7 @@
     ./services/ntfy.nix
     ./services/chive.nix
     ./services/lazycreep.nix
+    ./services/battlesnake.nix
     ./services/oracle-cloud-agent.nix
     ./services/misc.nix
   ];

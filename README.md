@@ -33,7 +33,7 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 ├── hosts/oci/
 │   ├── configuration.nix   # NixOS 入口，imports 下面的模块
 │   ├── boot.nix filesystems.nix network.nix users.nix packages.nix
-│   ├── services/           # wakapi / sillytavern / vaultwarden / ntfy / restic / cloudflared / chive / lazycreep / oracle-cloud-agent / misc
+│   ├── services/           # wakapi / sillytavern / vaultwarden / ntfy / restic / cloudflared / chive / lazycreep / battlesnake / oracle-cloud-agent / misc
 │   ├── home.nix            # ubuntu 用户的 Home Manager（含 dufs）
 │   ├── sillytavern.yaml    # SillyTavern 配置（无机密，进 git）
 │   └── chive.toml          # chive 虚拟仓配置（无机密，进 git）
@@ -373,7 +373,7 @@ asahi 保留 30 天、oci 保留 14 天），正常不需要手动跑。
 
 ## 服务出问题时会推送到手机（ntfy）
 
-`hosts/oci/services/ntfy.nix`：oci 上跑 ntfy 服务端，15 个关键单元挂了 `OnFailure=`，
+`hosts/oci/services/ntfy.nix`：oci 上跑 ntfy 服务端，16 个关键单元挂了 `OnFailure=`，
 失败时把 `systemctl status` 的尾巴推到 topic **`oci-alerts`**。
 
 订阅（手机装 ntfy app，或浏览器开 https://ntfy.xerxes2.com）：
@@ -483,6 +483,21 @@ journalctl -u sillytavern | grep claude-oauth   # 期望看到 Reverse proxy URL
 **更新插件**：`nix flake update sillytavern-claude-oauth` 再 switch。若上游的
 `pnpm-lock.yaml` 变了，构建会报 pnpmDeps hash 不匹配：把 nix 里的 `hash` 置空，
 rebuild，抄报错里的 `got:` 回去。
+
+## Battlesnake
+
+`hosts/oci/services/battlesnake.nix`，代码在自己的仓库
+[battlesnake](https://github.com/Xerxes-2/battlesnake)（flake input，提供包和 `services.battlesnake` 模块）。
+只监听 `127.0.0.1:8100`，经 cloudflared 隧道暴露为 `https://snake.xerxes2.com`
+（dashboard 里的 public hostname → `http://localhost:8100`）。**不套 Cloudflare Access**：
+调用方是 Battlesnake 的游戏服务器，过不了登录页；服务无状态，暴露出去没有风险。
+
+```bash
+curl -s https://snake.xerxes2.com/            # 期望返回 {"apiversion":"1",...}
+journalctl -u battlesnake -f                  # 每回合一行 move ... (x ms)
+```
+
+**更新蛇**：在蛇仓库推送后 `nix flake update battlesnake` 再 switch。
 
 ## 已知的坑
 
