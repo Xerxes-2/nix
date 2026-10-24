@@ -50,7 +50,7 @@ distrobox enter steam -- sudo python3 \
   /run/host/etc/nixos/hosts/asahi/steam/steam-dbus-bootstrap.py /usr/bin/steam
 ```
 
-## The three fixes
+## Container fixes
 
 ### 1. "Waiting for network" forever
 
@@ -80,61 +80,15 @@ The client is an x86 binary under FEX, so it reads fonts from the FEX rootfs,
 not from this container. `$HOME` is passed through to the guest, so
 `setup-home.sh` copies Noto CJK into `~/.local/share/fonts`.
 
-### 3. 32-bit OpenGL titles cannot create a GL context
+## Game compatibility
 
-Symptom, from `PROTON_LOG=1 WINEDEBUG=+wgl,+egl`:
-
-```
-00d8:warn:wgl:egl_init EGL support is disabled.
-00d8:trace:wgl:X11DRV_WineGL_InitOpenglInfo GL version : 4.6 ... Mesa 25.2.8
-00d8:trace:wgl:X11DRV_WineGL_InitOpenglInfo Direct rendering enabled: True   <- 64-bit fine
-013c:warn:wgl:egl_init EGL support is disabled.
-013c:err:wgl:X11DRV_WineGL_InitOpenglInfo  couldn't initialize OpenGL        <- 32-bit dead
-013c:warn:wgl:display_funcs_init glAccum not found.    (and every other gl* call)
-```
-
-Two independent causes stacked up on Fedora 42's separate Mesa overlays.
-Fedora 44 now uses a Fedora FEX rootfs and native GL thunks instead; validate
-stock Proton on that stack before assuming these old limitations still apply
-or deleting the compatibility tool:
-
-- **Wine 10.15+ made EGL the default GL backend on X11** and new WoW64 maps
-  32-bit GL buffers through Vulkan, so 32-bit apps have no GLX fallback. With
-  EGL disabled they get no OpenGL at all. This is not Asahi-specific and is
-  reproducible on x86-64: <https://bugs.winehq.org/show_bug.cgi?id=58754>,
-  <https://github.com/void-linux/void-packages/issues/57503>. Proton 9 (old
-  WoW64, real 32-bit wine) still uses GLX and avoids this half.
-- **pressure-vessel hides the FEX i386 Mesa overlay.** The Steam Linux Runtime
-  builds its own `/usr` for the game, and `mesa-fex-emu-overlay-i386` is not in
-  it, so even Proton 9 fails inside the container with
-  `set_pixel_format Invalid format 0`. The same run outside pressure-vessel
-  works.
-
-`compatibilitytools.d/proton9-nosrt` is the fix: a compat tool whose
-`toolmanifest.vdf` omits `require_tool_appid`, so Steam skips the runtime
-container and calls Proton directly.
-
-Select it per game under Properties -> Compatibility. DirectX titles do not
-need it - DXVK talks to Vulkan, which works inside pressure-vessel.
-
-TODO revisit: when Proton or the Steam Linux Runtime is updated.
-
-- check: the status of <https://bugs.winehq.org/show_bug.cgi?id=58754>, then run
-  a 32-bit OpenGL title on stock Proton with `PROTON_LOG=1 WINEDEBUG=+wgl,+egl`
-- then: delete `compatibilitytools.d/proton9-nosrt` once a stock Proton gets a
-  GL context inside pressure-vessel
-- last: 2026-10, rebuilt on Fedora 44 / muvm 0.7.0 / FEX 2604. Native and
-  x86_64 guest glxinfo both report accelerated OpenGL 4.6 / Mesa 26.2.5.
-  Stock Proton's 32-bit game path is pending a test through the logged-in
-  Steam client; earlier isolated-prefix launches stopped at SteamAPI init,
-  not a meaningful GL result. Keep `proton9-nosrt` for comparison.
+For Isaac, select the Windows build and official **Proton Experimental** under
+Properties -> Compatibility. It works on the Fedora 44 stack with the normal
+Steam Linux Runtime; no custom compatibility tool is needed. Other games still
+need per-game testing.
 
 ## Notes
 
-- Native Linux builds are often worse than the Windows ones here. Isaac's
-  native build segfaults right after its Theora init under both FEX and box64
-  (<https://github.com/ptitSeb/box64/issues/542>); the Windows build through
-  `proton9-nosrt` runs fine.
 - `PROTON_LOG=1 %command%` in a game's launch options writes
   `~/steam-<appid>.log`. Add `WINEDEBUG=+wgl,+egl` for graphics problems.
 - Harmless noise: `gameoverlayrenderer.so ... wrong ELF class`,

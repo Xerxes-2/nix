@@ -21,29 +21,10 @@ RUN dnf install -y 'dnf5-command(copr)' && \
     dnf copr enable -y @asahi/mesa && \
     dnf copr enable -y @asahi/fedora-remix-scripts
 
-# The FEX Mesa overlays live in per-architecture COPR repos that have to be
-# declared by hand, since dnf only pulls the native architecture by default.
-RUN for arch in i386 x86_64; do \
-      repo="/etc/yum.repos.d/group_asahi-mesa-$arch.repo"; \
-      printf '%s\n' \
-        "[copr:copr.fedorainfracloud.org:group_asahi:mesa-$arch]" \
-        "name=Copr repo for mesa owned by @asahi ($arch)" \
-        "baseurl=https://download.copr.fedorainfracloud.org/results/@asahi/mesa/fedora-\$releasever-$arch/" \
-        "type=rpm-md" \
-        "skip_if_unavailable=True" \
-        "gpgcheck=1" \
-        "gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-group_asahi-mesa" \
-        "repo_gpgcheck=0" \
-        "enabled=1" \
-        "enabled_metadata=1" \
-        "priority=5" \
-        "includepkgs=mesa-fex-emu-overlay-$arch*" \
-        > "$repo"; \
-    done
-
 RUN dnf clean all && dnf upgrade --refresh -y
 
-# FEX, muvm and the Asahi graphics stack.
+# Fedora 44's metapackage supplies the Fedora FEX rootfs and native GL thunks;
+# the old per-architecture Mesa overlay repositories are no longer needed.
 RUN dnf install -y asahi-platform-metapackage-fex
 
 # Userland distrobox expects to find, plus fonts and audio for Steam.
