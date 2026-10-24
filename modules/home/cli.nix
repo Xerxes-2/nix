@@ -71,6 +71,7 @@
     tokei
     tombi
     tree
+    tuios
     unar
     unzip
     uv
