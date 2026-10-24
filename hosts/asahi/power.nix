@@ -79,9 +79,9 @@
   #                        # "Monitored memory pressure cgroups"
   #   then:  replace this only if the NixOS module can target app.slice without
   #          also arming the root-owned user.slice and session.slice
-  #   last:  2026-10, locked systemd 262 / nixpkgs 02c087f: enableUserSlices
-  #          still arms both user.slice and every user-manager slice. Running
-  #          261.3: oomctl confirms only app.slice at 50%; 262 not activated.
+  #   last:  2026-10, running systemd 262 / nixpkgs 02c087f: oomctl confirms
+  #          only app.slice at 50% after reboot. enableUserSlices still arms
+  #          both user.slice and every user-manager slice; keep the drop-in.
   systemd.user.units."app.slice" = {
     overrideStrategy = "asDropin";
     text = ''
@@ -115,9 +115,9 @@
   #   check: cat /sys/class/power_supply/macsmc-battery/charge_control_end_threshold
   #          # 80 = in effect, 100 = no limit, ENOENT = driver dropped it
   #   then:  fall back to charge_behaviour, or drop the rule if it is a no-op
-  #   last:  2026-10, running 7.1.13 still reads 80. Locked asahi-7.2.12-2
-  #          still registers CHARGE_CONTROL_{START,END}_THRESHOLD when CHWA or
-  #          CHLS is present; runtime check on 7.2.12 pending.
+  #   last:  2026-10, running asahi-7.2.12-2: end threshold reads 80 after
+  #          reboot (start reads 75). The driver still registers both threshold
+  #          properties when CHWA or CHLS is present; keep the rule.
   services.udev.extraRules = ''
     SUBSYSTEM=="power_supply", KERNEL=="macsmc-battery", ATTR{charge_control_end_threshold}="80"
   '';
@@ -159,7 +159,7 @@
   # anything Apple-specific: it maps utilisation through capacity_freq_ref, a
   # deliberately fixed anchor (9942cb22ea45) latched at boot while boost was
   # still off, so the request saturates at exactly the non-boost ceiling. Fix is
-  # in flight and not in 7.1:
+  # in flight and still absent in 7.2.12:
   #   https://lore.kernel.org/linux-pm/20260806044230.909961-1-sibi.sankar@oss.qualcomm.com/
   # Keep the flag regardless: it is inert today and starts paying off on its own
   # once that lands, without needing to remember any of this.
@@ -169,10 +169,10 @@
   #          cat /sys/devices/system/cpu/cpufreq/policy4/scaling_cur_freq
   #          # 3264000 = schedutil still capped, 3504000 = the fix landed
   #   then:  delete the cpu-boost unit below, the tmpfiles flag is enough
-  #   last:  2026-10, running 7.1.13: four samples under a CPU4-pinned load
-  #          all read 3264000. Locked asahi-7.2.12-2 still latches
-  #          capacity_freq_ref at CPUFREQ_CREATE_POLICY (arch_topology.c:407),
-  #          and schedutil still uses it; runtime check on 7.2.12 pending.
+  #   last:  2026-10, running 7.2.12: CPU4 and CPU7 loaded separately under
+  #          schedutil, four samples each all read 3264000 despite boost=1 and
+  #          scaling_max_freq=3504000. capacity_freq_ref is still latched at
+  #          CPUFREQ_CREATE_POLICY (arch_topology.c:407); keep cpu-boost.
   systemd.tmpfiles.rules = [
     "w /sys/devices/system/cpu/cpufreq/boost - - - - 1"
   ];
