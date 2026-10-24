@@ -29,8 +29,9 @@ let
   #   then:  换下面的 revision / version / hash，rebuild 后确认日志里有
   #          "Sent metrics status: 200"
   #   last:  2026-10，latest/stable 仍是 1.63.0-9（snap revision 134，
-  #          2026-09-22 发布），无需换 pin。该版本已在运行，agent.log 里
-  #          每分钟一条 "Sent metrics status: 200"，上报正常
+  #          2026-09-22 发布），无需换 pin。该版本已在运行，
+  #          plugins/gomon/monitoring.log 每分钟一条 "Sent metrics status: 200"，
+  #          2026-10-24 远程复核最近三条均为 200，上报正常
   version = "1.63.0-9";
   revision = "134";
 

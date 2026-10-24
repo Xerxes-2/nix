@@ -52,8 +52,10 @@ TODO revisit: on muvm / Fedora Asahi updates.
 - check: inside the guest, `ls /run/dbus/system_bus_socket`
 - then: drop `steam-dbus-bootstrap.py` once a system bus is already there, or
   once `muvm -x` runs late enough to be usable
-- last: 2026-09, muvm 0.5.1 still starts the payload without the socket;
-  using the upstream script through `-x` exits 1 before the payload starts
+- last: 2026-10, upstream has released muvm 0.7.0 (2026-10-13), but the local
+  Steam container is stopped; its guest/socket behaviour was not retested.
+  Last runtime test was muvm 0.5.1: no socket, and the upstream `-x` script
+  exited 1 before the payload. Keep the workaround until a guest test passes.
 
 ### 2. Tofu everywhere
 
@@ -101,9 +103,11 @@ TODO revisit: when Proton or the Steam Linux Runtime is updated.
   a 32-bit OpenGL title on stock Proton with `PROTON_LOG=1 WINEDEBUG=+wgl,+egl`
 - then: delete `compatibilitytools.d/proton9-nosrt` once a stock Proton gets a
   GL context inside pressure-vessel
-- last: 2026-09, bug still `UNCONFIRMED` (untouched upstream since 2025-10).
-  Proton Experimental 11.0-20260814b with SLR 4.0.20260805 still exits on
-  Isaac, while Proton 9 without SLR gets a 32-bit OpenGL 4.6 context and runs.
+- last: 2026-10, Wine bug 58754 is still `UNCONFIRMED`, last changed
+  2026-09-22 (not untouched since 2025-10). Local Proton Experimental
+  11.0-20260814b / SLR 4.0.20260805 are unchanged; no game was launched in
+  this review. The last runtime test failed on Isaac with that pair, while
+  Proton 9 without SLR got a 32-bit OpenGL 4.6 context and ran.
 
 ## Notes
 

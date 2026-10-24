@@ -79,9 +79,9 @@
   #                        # "Monitored memory pressure cgroups"
   #   then:  replace this only if the NixOS module can target app.slice without
   #          also arming the root-owned user.slice and session.slice
-  #   last:  2026-09, systemd 261.2 - app.slice is monitored at 50%. The
-  #          nixpkgs option now arms every user-manager slice, but also
-  #          user.slice; it still cannot express the app.slice-only policy here.
+  #   last:  2026-10, locked systemd 262 / nixpkgs 02c087f: enableUserSlices
+  #          still arms both user.slice and every user-manager slice. Running
+  #          261.3: oomctl confirms only app.slice at 50%; 262 not activated.
   systemd.user.units."app.slice" = {
     overrideStrategy = "asDropin";
     text = ''
@@ -115,9 +115,9 @@
   #   check: cat /sys/class/power_supply/macsmc-battery/charge_control_end_threshold
   #          # 80 = in effect, 100 = no limit, ENOENT = driver dropped it
   #   then:  fall back to charge_behaviour, or drop the rule if it is a no-op
-  #   last:  2026-09, 7.1.13 - sysfs reads 80 on this machine, and the source
+  #   last:  2026-10, running 7.1.13 still reads 80. Locked asahi-7.2.12-2
   #          still registers CHARGE_CONTROL_{START,END}_THRESHOLD when CHWA or
-  #          CHLS is present.
+  #          CHLS is present; runtime check on 7.2.12 pending.
   services.udev.extraRules = ''
     SUBSYSTEM=="power_supply", KERNEL=="macsmc-battery", ATTR{charge_control_end_threshold}="80"
   '';
@@ -169,9 +169,10 @@
   #          cat /sys/devices/system/cpu/cpufreq/policy4/scaling_cur_freq
   #          # 3264000 = schedutil still capped, 3504000 = the fix landed
   #   then:  delete the cpu-boost unit below, the tmpfiles flag is enough
-  #   last:  2026-09, 7.1.13 - a pinned load still tops out at 3264000;
-  #          capacity_freq_ref is still latched from policy->cpuinfo.max_freq at
-  #          CPUFREQ_CREATE_POLICY (arch_topology.c:407).
+  #   last:  2026-10, running 7.1.13: four samples under a CPU4-pinned load
+  #          all read 3264000. Locked asahi-7.2.12-2 still latches
+  #          capacity_freq_ref at CPUFREQ_CREATE_POLICY (arch_topology.c:407),
+  #          and schedutil still uses it; runtime check on 7.2.12 pending.
   systemd.tmpfiles.rules = [
     "w /sys/devices/system/cpu/cpufreq/boost - - - - 1"
   ];

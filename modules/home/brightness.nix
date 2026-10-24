@@ -54,21 +54,25 @@ let
   };
 in
 {
-  # No nixpkgs module and no unit in the package, so both are declared here.
+  # Home Manager has services.wluma, but its unit adds sandboxing and changes
+  # Restart to always. Keep this unit until those differences are tested with
+  # logind's SetBrightness; switching modules is not part of a schema review.
   #
   # TODO revisit: on wluma bumps - 4.11.1 is well behind upstream main, and the
   # newer config schema is incompatible in both directions
   #   check: nix eval --raw /etc/nixos#nixosConfigurations.asahi.pkgs.wluma.version
   #          then compare against the Configuration section in
   #          https://github.com/max-baz/wluma/blob/<version>/README.md
-  #   then:  5.0 has moved to ext-image-copy-capture-v1, added an [idle]
-  #          section (which overlaps with Noctalia's idle handling) and a
-  #          per-output `gamma` flag. That flag matters: newer wluma takes
+  #   then:  5.x adds ext-image-copy-capture-v1, an [idle] section (which
+  #          overlaps with Noctalia's idle handling) and a per-output `gamma`
+  #          flag. That flag matters: newer wluma takes
   #          wlr-gamma-control *exclusively* for its dim/colour-temperature
   #          feature, which would fight both Noctalia night light and the niri
   #          software-gamma patch. Set `gamma = false` when bumping.
-  #   last:  2026-09, nixpkgs is still on 4.11.1: no [idle], no gamma, and
-  #          wlr-screencopy only; upstream has released 5.0.0.
+  #   last:  2026-10, nixpkgs 02c087f still has 4.11.1, and the running
+  #          service is healthy. Upstream 5.0.4 still needs the schema review,
+  #          idle-policy reconciliation and gamma=false; do not add 5.x keys
+  #          to the current 4.x config.
   xdg.configFile."wluma/config.toml".source = wlumaConfig;
 
   systemd.user.services.wluma = {

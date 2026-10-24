@@ -606,7 +606,8 @@ rg -n --glob '!flake.lock' 'TODO revisit' /etc/nixos
 ```
 
 升级 `nixpkgs` / 内核 / noctalia 之后按这份清单走一遍，能删的就删掉，删不掉的把
-`last:` 那行的日期和结论更新掉。
+`last:` 那行的日期和结论更新掉。**源码核对、求值、dry-run 不等于构建或运行验证**；
+复查时分别记下 flake 锁定版本和机器实际运行版本，没做的测试明确标待验证。
 
 ## 迁移历史
 

@@ -29,9 +29,9 @@ let
   #          mozilla-firefox/firefox - it walks /dev itself, so a `media` match
   #          in that file is the signal
   #   then:  drop the MOZ_DISABLE_RDD_SANDBOX wrapper below
-  #   last:  2026-10, firefox 157.0 / zen 1.22.3b - AddV4l2Dependencies still
-  #          opens /dev itself and matches only the "video" prefix, on
-  #          FIREFOX_157_0_RELEASE and on mozilla-central, no /dev/media
+  #   last:  2026-10, firefox 158.0 / zen 1.23.4b locked. On
+  #          FIREFOX_158_0_RELEASE and Firefox main, AddV4l2Dependencies still
+  #          opens /dev itself and matches only "video", no /dev/media.
   #
   # The flake's own `env` option would do this, but it lives in its home-manager
   # module and hangs the var off the *unwrapped* derivation (gappsWrapperArgs
@@ -285,8 +285,9 @@ in
   #   then:  drop the overrideAttrs and hosts/asahi/niri/software-gamma.patch
   #   test:  nix run nixpkgs#wlsunset -- -t 2000 -T 2001 -S 23:59 -s 00:01
   #          should warm the screen within a second; Ctrl-C restores it
-  #   last:  2026-09, niri 26.04 - no upstream support (no `software_gamma`,
-  #          tty.rs still only does DRM gamma props), patch applies clean
+  #   last:  2026-10, niri 26.04 - no upstream support (no `software_gamma`,
+  #          tty.rs still only does DRM gamma props); patch --dry-run applies
+  #          cleanly to the locked source. No screen-colour test this review.
 
   # No geoclue any more. Noctalia resolves its own coordinates for the weather
   # widget and the night-light schedule (`[location]` in home.nix), so both the

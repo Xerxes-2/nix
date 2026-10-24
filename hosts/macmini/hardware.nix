@@ -49,15 +49,17 @@
   # 想玩新 bcachefs 改 boot.bcachefs.package，不用换内核。
   # TODO revisit: 升级 nixpkgs 后
   #   check: nix build .#nixosConfigurations.macmini.config.system.build.toplevel
-  #   then:  bcachefs 模块编译失败就固定到它支持的较旧 LTS（linuxPackages_6_12 等）
-  #   last:  2026-10, nixpkgs c59305b：内核 6.18.54 + bcachefs 1.39.6 正常
+  #   then:  编译失败就选 kernel-module.nix 的 meta.broken 范围内的 LTS；
+  #          当前要求 >= 6.16 且 < 7.4，不能退到 6.12
+  #   last:  2026-10, nixpkgs 02c087f：6.18.57 + bcachefs 1.39.7 求值和
+  #          构建 dry-run 通过，实编待 x86_64 工作站；上次实编为 6.18.54 + 1.39.6
   boot.kernelPackages = pkgs.linuxPackages;
   # 树外 bcachefs 模块装的时候没去调试信息：initrd 里它压缩后还有 14 MB
   # （解压 86 MB），去掉后 1.2 MB。
   # TODO revisit: 升级 nixpkgs 后
   #   check: grep INSTALL_MOD_STRIP pkgs/by-name/bc/bcachefs-tools/kernel-module.nix
   #   then:  上游加了就删掉这段
-  #   last:  2026-10, nixpkgs c59305b：没加
+  #   last:  2026-10, nixpkgs 02c087f：kernel-module.nix 仍没加，保留 override
   boot.bcachefs.modulePackage =
     (config.boot.kernelPackages.callPackage config.boot.bcachefs.package.kernelModule { }).overrideAttrs
       (o: {
@@ -106,7 +108,12 @@
     debug = true;
     # RX 和 TX 状态走 NAPI + GRO：TCP RX 约 200 → 235 Mbps（wl 约 210）。
     # 默认关闭的选项；出问题时删掉这一行即回到 IRQ 线程直接上交。
-    # TODO revisit：BA 会话 drain/epoch 尚未处理，长期观察后再决定是否保留。
+    # TODO revisit: 更新 b43-ht 或完成长期观测后，复查 BA 会话 drain/epoch
+    #   check: 对照 b43-ht 的 DEVELOPMENT.md / NOTES.md，并经有线管理链路
+    #          测 BA stop/start、重连、控制器重启、休眠恢复和持续双向流量
+    #   then:  drain/epoch 完善且长测稳定后删 TODO；出现回归则禁用 htphy_napi
+    #   last:  2026-10, 锁定 1377b58：仍注明 BA drain/epochs 未处理；已有
+    #          6 小时 soak 和 BA stop/start 记录，但本次未连上 macmini 复测
     extraOptions = [ "htphy_napi=1" ];
   };
 
@@ -132,7 +139,8 @@
   # TODO revisit: 升级 nixpkgs/内核后
   #   check: nix build .#nixosConfigurations.macmini.config.system.build.toplevel
   #   then:  broadcom-sta 编译失败就删掉 wl 启动项（b43-ht 已是日常驱动）
-  #   last:  2026-10, broadcom-sta 6.30.223.271-63 + 内核 6.18.54
+  #   last:  2026-10, broadcom-sta 6.30.223.271-63 + 内核 6.18.57 求值和
+  #          构建 dry-run 通过，实编待 x86_64 工作站；insecure 标记仍在
   nixpkgs.config.allowInsecurePredicate = pkg: lib.getName pkg == "broadcom-sta";
 
   # ===== 文件系统 =====
