@@ -4,8 +4,8 @@
 # an IIO device); the factory calibration blob that it needs to report real lux
 # rather than a constant 0 ships in the vendor firmware package as
 # apple/aop-als-cal.bin. Verify both before blaming this module:
-#   cat /sys/bus/iio/devices/iio:device1/in_illuminance_input   # must react to light
-#   zstd -dc "$(readlink -f /run/current-system/firmware)/apple/aop-als-cal.bin.zst" | wc -c
+#   cat /sys/bus/iio/devices/iio:device*/in_illuminance_input  # must react to light
+#   zstd -dc "$(readlink -f /run/current-system/firmware/apple/aop-als-cal.bin.zst)" | wc -c
 #                                                              # 193 here, 0 means uncalibrated
 # If the calibration is missing, it is regenerated from macOS - boot macOS, run
 # `curl -L https://alx.sh/dev | bash` and pick "Rebuild vendor firmware
@@ -69,10 +69,11 @@ in
   #          wlr-gamma-control *exclusively* for its dim/colour-temperature
   #          feature, which would fight both Noctalia night light and the niri
   #          software-gamma patch. Set `gamma = false` when bumping.
-  #   last:  2026-10, nixpkgs 02c087f still has 4.11.1, and the running
-  #          service is healthy. Upstream 5.0.4 still needs the schema review,
-  #          idle-policy reconciliation and gamma=false; do not add 5.x keys
-  #          to the current 4.x config.
+  #   last:  2026-10, nixpkgs 02c087f still has 4.11.1. After reboot into
+  #          7.2.12 the service is active, ALS samples vary (73/73/72 lux), and
+  #          the calibration blob is 193 bytes. Upstream 5.0.4 still needs the
+  #          schema review, idle reconciliation and gamma=false; no 5.x keys
+  #          belong in the current 4.x config.
   xdg.configFile."wluma/config.toml".source = wlumaConfig;
 
   systemd.user.services.wluma = {

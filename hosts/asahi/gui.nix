@@ -29,9 +29,10 @@ let
   #          mozilla-firefox/firefox - it walks /dev itself, so a `media` match
   #          in that file is the signal
   #   then:  drop the MOZ_DISABLE_RDD_SANDBOX wrapper below
-  #   last:  2026-10, firefox 158.0 / zen 1.23.4b locked. On
-  #          FIREFOX_158_0_RELEASE and Firefox main, AddV4l2Dependencies still
-  #          opens /dev itself and matches only "video", no /dev/media.
+  #   last:  2026-10, Firefox 158 release/main still only match "video", not
+  #          /dev/media. On kernel 7.2.12, Zen 1.23.4b actually decodes H.264
+  #          through /dev/video0 + /dev/media0 with the wrapper; sandboxed
+  #          Firefox plays the same sample in software. Keep the workaround.
   #
   # The flake's own `env` option would do this, but it lives in its home-manager
   # module and hangs the var off the *unwrapped* derivation (gappsWrapperArgs
@@ -92,8 +93,12 @@ let
   #          pkgs/applications/networking/browsers/firefox/wrapper.nix), and
   #          whether widevine-cdm still installs only the Chromium layout
   #   then:  drop the prefs/GMP dir in favour of whatever option it exposes
-  #   last:  2026-10, widevine-cdm 120.0.6098.0-7a3928f - unchanged, and
-  #          wrapper.nix still has no mention of gmp/widevine at all
+  #   last:  2026-10, CDM 120.0.6098.0-7a3928f / wrapper.nix unchanged.
+  #          Firefox 158 creates MediaKeys and maps libwidevinecdm.so. Zen
+  #          1.23.4b rejects EME: its real unwrapped defaults/pref lacks this
+  #          file, despite the symlinkJoin copy below. The same prefs in an
+  #          isolated profile make Zen load the CDM and create MediaKeys;
+  #          fix the package's pref injection. Licensed playback not tested.
   widevineGmp = pkgs.runCommand "widevine-gmp" { } ''
     cdm=${pkgs.widevine-cdm}/share/google/chrome/WidevineCdm
     install -Dm444 "$cdm/manifest.json" $out/gmp-widevinecdm/system-installed/manifest.json
@@ -285,9 +290,10 @@ in
   #   then:  drop the overrideAttrs and hosts/asahi/niri/software-gamma.patch
   #   test:  nix run nixpkgs#wlsunset -- -t 2000 -T 2001 -S 23:59 -s 00:01
   #          should warm the screen within a second; Ctrl-C restores it
-  #   last:  2026-10, niri 26.04 - no upstream support (no `software_gamma`,
-  #          tty.rs still only does DRM gamma props); patch --dry-run applies
-  #          cleanly to the locked source. No screen-colour test this review.
+  #   last:  2026-10, niri 26.04 still needs the patch; dry-run applies.
+  #          On kernel 7.2.12 gamma-control is advertised despite no GAMMA_LUT.
+  #          Noctalia 5.3.0 force-toggle sets 4000K then restores 6500K without
+  #          gamma/shader errors; physical screen colour needs visual confirmation.
 
   # No geoclue any more. Noctalia resolves its own coordinates for the weather
   # widget and the night-light schedule (`[location]` in home.nix), so both the

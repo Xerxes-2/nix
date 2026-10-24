@@ -51,8 +51,8 @@
   #   check: nix build .#nixosConfigurations.macmini.config.system.build.toplevel
   #   then:  编译失败就选 kernel-module.nix 的 meta.broken 范围内的 LTS；
   #          当前要求 >= 6.16 且 < 7.4，不能退到 6.12
-  #   last:  2026-10, nixpkgs 02c087f：6.18.57 + bcachefs 1.39.7 求值和
-  #          构建 dry-run 通过，实编待 x86_64 工作站；上次实编为 6.18.54 + 1.39.6
+  #   last:  2026-10, nixpkgs 02c087f：cachy 实编 6.18.57 + bcachefs 1.39.7
+  #          模块成功，带 .ko.cer；完整系统构建被 wl 的证书打包错误阻断（见下）
   boot.kernelPackages = pkgs.linuxPackages;
   # 树外 bcachefs 模块装的时候没去调试信息：initrd 里它压缩后还有 14 MB
   # （解压 86 MB），去掉后 1.2 MB。
@@ -139,8 +139,10 @@
   # TODO revisit: 升级 nixpkgs/内核后
   #   check: nix build .#nixosConfigurations.macmini.config.system.build.toplevel
   #   then:  broadcom-sta 编译失败就删掉 wl 启动项（b43-ht 已是日常驱动）
-  #   last:  2026-10, broadcom-sta 6.30.223.271-63 + 内核 6.18.57 求值和
-  #          构建 dry-run 通过，实编待 x86_64 工作站；insecure 标记仍在
+  #   last:  2026-10, cachy 实编 broadcom-sta 6.30.223.271-63 / 6.18.57
+  #          模块成功，但完整系统构建在 kmod aggregator 失败：缺 wl.ko.cer。
+  #          上游 installPhase 只拷 wl.ko，没走 modules_install 的签名安装流程；
+  #          需修打包或移除 wl 回退后才能部署。insecure 标记仍在
   nixpkgs.config.allowInsecurePredicate = pkg: lib.getName pkg == "broadcom-sta";
 
   # ===== 文件系统 =====
