@@ -11,7 +11,9 @@
 #   distrobox enter steam -- steam
 #
 # Adapted from https://gist.github.com/stevesoltys/af4c5c45317c543fa3b88da7d08a7218
-FROM quay.io/fedora/fedora-minimal:42
+# Fedora 42's repositories stopped at muvm 0.5.1; 44 carries muvm 0.7 and
+# current libkrun/FEX. A host NixOS upgrade cannot update this userland.
+FROM quay.io/fedora/fedora-minimal:44
 WORKDIR /
 
 # COPR plugin plus the Asahi repositories.

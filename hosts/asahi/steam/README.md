@@ -1,8 +1,8 @@
 # Steam on Asahi
 
-Steam has no `aarch64-linux` build, and the FEX x86 rootfs is a runtime download
-that does not fit the Nix model, so `programs.steam` cannot work here: it fails
-with `i686 Linux package set can only be used with the x86 family`.
+Steam has no `aarch64-linux` build, so `programs.steam` cannot work here:
+it fails with `i686 Linux package set can only be used with the x86 family`.
+Fedora 44 packages the FEX x86 rootfs as `fex-emu-rootfs-fedora`.
 
 Fedora Asahi Remix packages the whole stack (`dnf install steam`), so we run
 that inside a container instead of reproducing it in nixpkgs.
@@ -11,7 +11,7 @@ that inside a container instead of reproducing it in nixpkgs.
 
 ```
 niri on NixOS          aarch64, 16K pages, Honeykrisp Vulkan
-  └─ podman/distrobox  Fedora 42 + @asahi COPRs
+  └─ podman/distrobox  Fedora 44 + @asahi COPRs
       └─ muvm          microVM with a 4K-page kernel, GPU passed through
           └─ FEX       x86_64/i386 emulation
               └─ Proton, DXVK/vkd3d-proton
@@ -26,12 +26,29 @@ page sizes between processes - hence the microVM. See
 ```sh
 podman build -t steam:latest /etc/nixos/hosts/asahi/steam
 distrobox create --name steam --image localhost/steam:latest --home ~/Distrobox/steam
-distrobox enter steam -- /etc/nixos/hosts/asahi/steam/setup-home.sh
+distrobox enter steam -- /run/host/etc/nixos/hosts/asahi/steam/setup-home.sh
 distrobox enter steam -- steam
 ```
 
 `niri` starts `xwayland-satellite` (see `hosts/asahi/niri/config.kdl`), which is
 what gives Steam - an X11-only client - a display.
+
+## Update
+
+`distrobox upgrade steam` updates packages within the container's Fedora release;
+it does not follow host NixOS upgrades or change the Fedora release. To move to
+a new release, change `FROM` in `Containerfile`, rebuild the image, stop/rename
+the old container, and create `steam` again with the **same `--home`**. Keep the
+old container until the new one has passed game tests; rebuilding an image alone
+does not update an existing container.
+
+An RPM update can replace the patched `/usr/bin/steam`. Reapply the bootstrap
+before launching if that happens:
+
+```sh
+distrobox enter steam -- sudo python3 \
+  /run/host/etc/nixos/hosts/asahi/steam/steam-dbus-bootstrap.py /usr/bin/steam
+```
 
 ## The three fixes
 
@@ -52,12 +69,10 @@ TODO revisit: on muvm / Fedora Asahi updates.
 - check: inside the guest, `ls /run/dbus/system_bus_socket`
 - then: drop `steam-dbus-bootstrap.py` once a system bus is already there, or
   once `muvm -x` runs late enough to be usable
-- last: 2026-10, host kernel 7.2.12; the existing container still has muvm
-  0.5.1, not upstream 0.7.0. A real 4K-page guest boots with accelerated
-  OpenGL 4.6, but has no system bus. Bootstrapping it inside the payload
-  creates the socket and makes the NetworkManager query fail immediately as
-  intended. The existing container's `/usr/bin/steam` is unpatched: rebuild
-  the image/apply the repository bootstrap before claiming the launcher works.
+- last: 2026-10, Fedora 44 / muvm 0.7.0 on host kernel 7.2.12: a real
+  4K-page guest still has no system bus. The rebuilt image includes the
+  launcher patch; bootstrapping inside the payload creates the socket.
+  Keep the workaround; a newer muvm alone does not provide the bus.
 
 ### 2. Tofu everywhere
 
@@ -78,7 +93,10 @@ Symptom, from `PROTON_LOG=1 WINEDEBUG=+wgl,+egl`:
 013c:warn:wgl:display_funcs_init glAccum not found.    (and every other gl* call)
 ```
 
-Two independent causes stack up:
+Two independent causes stacked up on Fedora 42's separate Mesa overlays.
+Fedora 44 now uses a Fedora FEX rootfs and native GL thunks instead; validate
+stock Proton on that stack before assuming these old limitations still apply
+or deleting the compatibility tool:
 
 - **Wine 10.15+ made EGL the default GL backend on X11** and new WoW64 maps
   32-bit GL buffers through Vulkan, so 32-bit apps have no GLX fallback. With
@@ -105,12 +123,11 @@ TODO revisit: when Proton or the Steam Linux Runtime is updated.
   a 32-bit OpenGL title on stock Proton with `PROTON_LOG=1 WINEDEBUG=+wgl,+egl`
 - then: delete `compatibilitytools.d/proton9-nosrt` once a stock Proton gets a
   GL context inside pressure-vessel
-- last: 2026-10, Wine bug 58754 remains `UNCONFIRMED` (last changed
-  2026-09-22). Experimental 11.0-20260814b / SLR 4.0.20260805 and Proton 9
-  without SLR were both tried on Isaac with isolated prefixes, but both exit
-  53 at SteamAPI initialization without a running Steam client. That does
-  not validate the game's 32-bit GL path. Keep the workaround; the last
-  successful game test remains Proton 9 without SLR from 2026-09.
+- last: 2026-10, rebuilt on Fedora 44 / muvm 0.7.0 / FEX 2604. Native and
+  x86_64 guest glxinfo both report accelerated OpenGL 4.6 / Mesa 26.2.5.
+  Stock Proton's 32-bit game path is pending a test through the logged-in
+  Steam client; earlier isolated-prefix launches stopped at SteamAPI init,
+  not a meaningful GL result. Keep `proton9-nosrt` for comparison.
 
 ## Notes
 

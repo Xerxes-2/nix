@@ -2,7 +2,7 @@
 # Set up the parts of the Steam distrobox home that the image cannot carry.
 #
 # Run inside the container:
-#   distrobox enter steam -- /etc/nixos/hosts/asahi/steam/setup-home.sh
+#   distrobox enter steam -- /run/host/etc/nixos/hosts/asahi/steam/setup-home.sh
 #
 # Idempotent; safe to re-run after recreating the container.
 set -eu
@@ -29,8 +29,9 @@ echo "fonts: $(ls "$fonts_dir" | wc -l) file(s) in $fonts_dir"
 
 # 2. The proton9-nosrt compatibility tool.
 #
-# See README.md: pressure-vessel hides the FEX i386 Mesa overlay, which breaks
-# every 32-bit OpenGL title. This tool runs Proton without that container.
+# Retain the Fedora 42 workaround while stock Proton is tested on Fedora 44's
+# new FEX rootfs/GL thunks (README.md). This tool skips pressure-vessel so the
+# old path remains available for comparison; do not force it for every game.
 tools_dir="$STEAM_HOME/.local/share/Steam/compatibilitytools.d"
 mkdir -p "$tools_dir"
 cp -r "$HERE/compatibilitytools.d/proton9-nosrt" "$tools_dir/"
