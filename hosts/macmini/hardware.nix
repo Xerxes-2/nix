@@ -42,7 +42,8 @@
     "sdhci_pci"
   ];
   boot.kernelModules = [ "kvm-intel" ];
-  boot.initrd.systemd.enable = true;
+  # 不写 boot.initrd.systemd.enable：nixpkgs 3ec6363 删掉了脚本版 stage-1，
+  # 该选项成了 mkRemovedOptionModule，systemd stage-1 现在是唯一实现。
 
   # 不追 linuxPackages_latest：bcachefs 已移出主线（6.18 起），现在是 nixpkgs
   # 按 bcachefs-tools 版本单独编译的树外模块，内核太新时它可能还没跟上而编译失败。

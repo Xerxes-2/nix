@@ -25,9 +25,10 @@
     efiSysMountPoint = "/boot/efi";
   };
 
-  # 迁移期间曾设为 false（NIXOS_LUSTRATE 只有脚本版 stage-1 实现）；
-  # lustrate 已完成，改回 unstable 默认的 systemd stage-1。
-  boot.initrd.systemd.enable = true;
+  # 迁移期间曾把它设成 false 再改回 true（NIXOS_LUSTRATE 只有脚本版 stage-1
+  # 实现）。nixpkgs 3ec6363 起脚本版 stage-1 整个被删掉，systemd stage-1 是唯一
+  # 实现，`boot.initrd.systemd.enable` 成了 mkRemovedOptionModule，设置它就断言失败。
+  # 什么都不用写。
 
   # 最新主线内核（启动失败可在 GRUB 选上一代回滚）
   boot.kernelPackages = pkgs.linuxPackages_latest;
