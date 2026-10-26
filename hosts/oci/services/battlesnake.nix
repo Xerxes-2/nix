@@ -21,7 +21,6 @@
     openFirewall = true;
   };
 
-  # 0.7.3 起程序默认把 Standard 天梯局按 game id 奇偶分成新旧两组对照。4 天约 450 局，
-  # 两组名次差在噪声内（z≈1.2），说明多线程和 0.6.1 的放宽重搜都不是掉分原因，全员用新配置。
-  systemd.services.battlesnake.environment.SNAKE_AB = "0";
+  # 程序默认开着天梯 A/B（game id 首位奇偶分组，见蛇仓库 Sessions.fs）：0.7.4 起对照新旧 Standard 权重。
+  # 有结论后设 systemd.services.battlesnake.environment.SNAKE_AB = "0" 关掉。
 }
