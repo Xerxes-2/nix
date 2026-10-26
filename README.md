@@ -503,6 +503,9 @@ sudo journalctl -u battlesnake -f             # 每回合一行 move ... (x ms)�
 
 **更新蛇**：在蛇仓库推送后 `nix flake update battlesnake` 再 switch。
 
+**天梯 A/B**：程序自带按 game id 首位奇偶分组的对照（`start` 日志里 `arm=legacy/new`），
+用来在同一批对手上比较新旧配置；现在用 `SNAKE_AB=0` 关着，要再做对照时去掉这行即可。
+
 ## 已知的坑
 
 **DRM 流媒体（Netflix / Spotify Web / Prime）需要 Widevine，Mozilla 不给 aarch64 出。**

@@ -20,4 +20,8 @@
     port = 8100;
     openFirewall = true;
   };
+
+  # 0.7.3 起程序默认把 Standard 天梯局按 game id 奇偶分成新旧两组对照。4 天约 450 局，
+  # 两组名次差在噪声内（z≈1.2），说明多线程和 0.6.1 的放宽重搜都不是掉分原因，全员用新配置。
+  systemd.services.battlesnake.environment.SNAKE_AB = "0";
 }
