@@ -40,11 +40,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793016845,
-        "narHash": "sha256-yP3hD4E3PMMevspN/7ZAOluble6n0LgoRY2gUYR0lPU=",
+        "lastModified": 1793097169,
+        "narHash": "sha256-itJZXtGkhaagxlr/md+dYn4eVj4A9LVyu3ZXRN7SX5Q=",
         "owner": "Xerxes-2",
         "repo": "battlesnake",
-        "rev": "b7664480beaef8ea28c242ff782d323e005aeaab",
+        "rev": "cbf2b288ac4f7c7e6803bb8c58b401915302c376",
         "type": "github"
       },
       "original": {

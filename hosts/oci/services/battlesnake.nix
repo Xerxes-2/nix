@@ -21,6 +21,6 @@
     openFirewall = true;
   };
 
-  # 程序默认开着天梯 A/B（game id 首位奇偶分组，见蛇仓库 Sessions.fs）：0.7.4 起对照新旧 Standard 权重。
+  # 程序默认开着天梯 A/B（game id 首位奇偶分组，见蛇仓库 Sessions.fs）：对照新旧权重（Standard 自 0.7.4、Duels 自 0.7.5）。
   # 有结论后设 systemd.services.battlesnake.environment.SNAKE_AB = "0" 关掉。
 }
