@@ -1,6 +1,31 @@
 # 跨机器共享的 CLI 工具集（Home Manager 模块，Linux/macOS 通用）。
 # 各 host 的 home.nix 导入此模块，平台特有工具在各自 host 里追加。
 { lib, pkgs, ... }:
+let
+  # steel 0.8.3 turns its cranelift JIT on by default, and on aarch64-linux the
+  # JIT code corrupts memory: `steel install.scm` in postInstall segfaults
+  # (exit 139), and Hydra fails the same drv (build 351596897). The bug is
+  # https://github.com/mattwparas/steel/issues/722, and STEEL_JIT=false is
+  # confirmed to work around it. Upstream already compiles the JIT out on
+  # windows-aarch64, so we add linux to that cfg. That fixes the build and
+  # runtime together without a wrapper env var. aarch64-darwin is unaffected
+  # and keeps the cached original.
+  # TODO revisit: on every steel bump
+  #   check: steel#722 is closed / Hydra steel.aarch64-linux builds green
+  #   then:  drop this override and use pkgs.steel directly
+  #   last:  2026-10, steel 0.8.3, #722 open
+  steel =
+    if pkgs.stdenv.hostPlatform.isLinux && pkgs.stdenv.hostPlatform.isAarch64 then
+      pkgs.steel.overrideAttrs (old: {
+        postPatch = (old.postPatch or "") + ''
+          substituteInPlace crates/steel-core/src/steel_vm/vm.rs crates/steel-core/src/steel_vm/vm/jit.rs \
+            --replace-fail 'all(target_os = "windows", target_arch = "aarch64")' \
+                           'all(any(target_os = "windows", target_os = "linux"), target_arch = "aarch64")'
+        '';
+      })
+    else
+      pkgs.steel;
+in
 {
   # nh：nixos-rebuild / darwin-rebuild 的前端，自带 nvd 式的版本 diff 和构建树。
   # flake 写进 NH_FLAKE，`nh os switch` / `nh darwin switch` 不用再带路径；
@@ -65,7 +90,7 @@
     sd
     socat
     sqlite
-    steel
+    steel # let 里的版本：aarch64-linux 关 JIT
     steelix
     tldr
     tokei
