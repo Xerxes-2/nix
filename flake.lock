@@ -425,11 +425,11 @@
     "sillytavern-claude-oauth": {
       "flake": false,
       "locked": {
-        "lastModified": 1791478596,
-        "narHash": "sha256-9ogHK/akjEv2AzyGVb4bh1g6cYZTS2CT9ZchaASEoGw=",
+        "lastModified": 1794138854,
+        "narHash": "sha256-SnSZJzmu5IAX/+WZD6ZgLS7OUOxEni0r4eYTNcRf4rU=",
         "owner": "Xerxes-2",
         "repo": "sillytavern-claude-oauth",
-        "rev": "cfa7056408490e614ba1461a5fd6b3d3dc459348",
+        "rev": "b5e6b48de684ba6f1ebed11dad12508db3bd9235",
         "type": "github"
       },
       "original": {
