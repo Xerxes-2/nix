@@ -59,18 +59,22 @@
   hardware.asahi = {
     enable = true;
     setupAsahiSound = true;
-    peripheralFirmwareDirectory = inputs.asahi-firmware;
+    # Load this machine's firmware/calibration from the ESP at boot, so
+    # regenerating vendorfw cannot leave a stale copy pinned in flake.lock.
+    # https://github.com/nix-community/nixos-apple-silicon/pull/588
 
     # AVD is a stateless decoder, so it only speaks the V4L2 Stateless API, and
     # desktop software speaks VA-API and essentially nothing else. Upstream's
     # video module ships the avd-fw firmware plus sofus13's VA-API -> V4L2
-    # Stateless translation layer, and sets LIBVA_DRIVER_NAME globally - libva
-    # picks its driver from the DRM driver name, which is "asahi" here, and no
-    # asahi_drv_video.so will ever exist. It defaults vaapi-support to false for
+    # Stateless translation layer (asahi_drv_video.so), and sets
+    # LIBVA_DRIVER_NAME=asahi globally. It defaults vaapi-support to false for
     # stability reasons, so ask for it explicitly. (This used to be avd.nix.)
     # The variable also leaks into the muvm/FEX guest, where the name resolves to
     # nothing and VA-API init fails - harmless, games use Vulkan, not VA-API.
     avd.vaapi-support = true;
+    # Include H.264/HEVC as well as AV1/VP9: all_free omits the former,
+    # which would send common browser video streams back to software decoding.
+    avd.codecs = [ "all" ];
   };
 
   # vainfo, for checking that the VA-API setup above actually took.

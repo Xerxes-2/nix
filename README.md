@@ -281,22 +281,15 @@ asahi 的内核来自 `nixos-apple-silicon`，上游**没有 binary cache**（�
 
 ## 更新 Asahi 固件
 
-`asahi-firmware` 是一个 `path:/boot/vendorfw` 输入，内容被 flake.lock 按哈希锁住。
-在 macOS 侧跑过 Asahi 安装器的 "Rebuild vendor firmware package" 之后，必须重新锁定
-才会生效（**只能在 MacBook 上做**，那个路径只有它有）：
+本机固件和设备校准数据在启动时由 initrd 从 ESP 的
+`vendorfw/firmware.cpio` 加载，不再作为 flake 输入锁定或在构建时打包。
+在 macOS 侧跑过 Asahi 安装器的 "Rebuild vendor firmware package" 后，
+重启进入 NixOS 即会加载新固件，无需更新 flake.lock 或重新构建系统。
+不要删除 ESP 上的 `vendorfw` 目录；迁移到此配置后需先构建、应用并重启一次。
 
-```bash
-nix flake update asahi-firmware
-sudo nixos-rebuild switch --flake /etc/nixos
-```
-
-正因为它是本机路径，在 oci 上裸跑 `nix flake update` 会直接中止、一个输入都更不了：
-
-```
-error: path '//boot/vendorfw' does not exist
-```
-
-`nix run .#update` 会自动跳过本机不存在的本地 path 输入，所以两台机器上都能直接跑。
+AVD 硬解启用 VA-API，并设置 `hardware.asahi.avd.codecs = [ "all" ]`，
+包含 H.264/HEVC；上游默认的 `all_free` 仅包含 AV1/VP9。AVD 固件由构建生成，
+与 ESP 中的本机固件分开管理，改动 AVD 配置仍需重新构建并应用。
 
 ## 切回 macOS
 

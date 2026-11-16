@@ -7,10 +7,6 @@
       url = "github:nix-community/nixos-apple-silicon";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
-    asahi-firmware = {
-      url = "path:/boot/vendorfw";
-      flake = false;
-    };
     zen-browser = {
       url = "github:0xc000022070/zen-browser-flake";
       inputs.nixpkgs.follows = "nixpkgs-unstable";

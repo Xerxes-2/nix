@@ -5,11 +5,11 @@
 # rather than a constant 0 ships in the vendor firmware package as
 # apple/aop-als-cal.bin. Verify both before blaming this module:
 #   cat /sys/bus/iio/devices/iio:device*/in_illuminance_input  # must react to light
-#   zstd -dc "$(readlink -f /run/current-system/firmware/apple/aop-als-cal.bin.zst)" | wc -c
+#   wc -c /lib/firmware/vendor/apple/aop-als-cal.bin
 #                                                              # 193 here, 0 means uncalibrated
 # If the calibration is missing, it is regenerated from macOS - boot macOS, run
 # `curl -L https://alx.sh/dev | bash` and pick "Rebuild vendor firmware
-# package", then update the asahi-firmware flake input.
+# package", then reboot into NixOS to load the new calibration from the ESP.
 { pkgs, ... }:
 let
   # Upstream's own example thresholds. These are *labels*, not brightness

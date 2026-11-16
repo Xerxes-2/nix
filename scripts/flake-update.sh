@@ -40,12 +40,8 @@ cd "$(jj workspace root)"
 
 # 哪些输入在这台机器上更得动。
 #
-# asahi-firmware 是 `path:/boot/vendorfw`，只有 MacBook 上存在。裸跑
-# `nix flake update` 会在这个输入上直接中止，导致 oci 上一个输入都更不了：
-#
-#     error: path '//boot/vendorfw' does not exist
-#
-# 所以不给参数时不用裸的全量更新，而是显式列出本机可解析的输入。
+# 若以后加入本地 path 输入，远端机器可能没有对应路径；显式列出可解析
+# 的输入，避免一个缺失路径阻断其余输入的更新。
 skipped=""
 usable=()
 while IFS=$'\t' read -r name localpath; do
