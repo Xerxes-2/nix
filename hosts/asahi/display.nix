@@ -1,11 +1,11 @@
 # Single source of truth for the built-in panel of the 14" MacBook Pro.
 #
 # Everything that has to line up with the notch is derived from the scale, so
-# changing `scaleText` below is enough: the niri output, the bar's notch spacer
+# changing `scaleText` below is enough: the Umbriel output, the bar's notch spacer
 # and the bar thickness all follow.
 { }:
 let
-  # Written verbatim into niri's config.kdl, parsed for the notch math.
+  # Written verbatim into Umbriel's config.toml, parsed for the notch math.
   scaleText = "1.75";
   scale = builtins.fromJSON scaleText;
 

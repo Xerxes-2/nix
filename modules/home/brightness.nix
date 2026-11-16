@@ -67,8 +67,8 @@ in
   #          overlaps with Noctalia's idle handling) and a per-output `gamma`
   #          flag. That flag matters: newer wluma takes
   #          wlr-gamma-control *exclusively* for its dim/colour-temperature
-  #          feature, which would fight both Noctalia night light and the niri
-  #          software-gamma patch. Set `gamma = false` when bumping.
+  #          feature, which would fight Noctalia night light, including Umbriel's
+  #          software Gamma fallback. Set `gamma = false` when bumping.
   #   last:  2026-10, nixpkgs 02c087f still has 4.11.1. After reboot into
   #          7.2.12 the service is active, ALS samples vary (73/73/72 lux), and
   #          the calibration blob is 193 bytes. Upstream 5.0.4 still needs the

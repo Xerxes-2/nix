@@ -61,7 +61,7 @@
   # exemption set inside the session (systemd.resource-control(5)).
   #
   # Monitoring app.slice inside the user manager keeps the compositor safe in
-  # session.slice and lets oomd choose among app cgroups such as niri's terminal
+  # session.slice and lets oomd choose among app cgroups such as Umbriel's terminal
   # scopes. Programs launched by Noctalia inherit noctalia.service and therefore
   # form one candidate with the shell; do not exempt that service, because doing
   # so would also shield a runaway browser below it. Preferences are honoured

@@ -43,11 +43,11 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 │   ├── filesystems.nix     # btrfs 压缩/挂载选项，叠加在上面那份之上
 │   ├── power.nix           # zswap / 电池上限 / 电源键 / systemd-oomd
 │   ├── dualboot.nix        # 切回 macOS、同步 macOS 的蓝牙/Wi-Fi 凭据
-│   ├── gui.nix             # niri + noctalia-greeter + 音频 + 字体 + Widevine
+│   ├── gui.nix             # Umbriel + noctalia-greeter + 音频 + 字体 + Widevine
 │   ├── display.nix         # 内屏刘海几何的唯一真相，缩放改这里
 │   ├── input.nix           # fcitx5 双拼
 │   ├── steam.nix           # 原生 muvm/FEX Steam 和桌面入口
-│   ├── niri/               # config.kdl + 软件夜间模式补丁（见 gui.nix 的注释）
+│   ├── umbriel/            # config.nix + 上游软件 Gamma 的连接补丁
 │   ├── home.nix            # xerxes2 用户的 Home Manager，含 noctalia 的 config.toml
 │   └── steam/              # 原生 Steam 使用文档，见其 README
 ├── hosts/macmini/          # Mac mini Mid 2011 Server，无头，见「Mac mini」
@@ -282,6 +282,44 @@ nix eval --raw .#nixosConfigurations.asahi.config.system.build.toplevel.drvPath
 
 asahi 的内核来自 `nixos-apple-silicon`，上游**没有 binary cache**（见其
 `docs/binary-cache.md`），所以 nixpkgs 一动就要本地编内核，几十分钟起步。
+
+## Asahi 桌面（Umbriel）
+
+桌面使用 Umbriel + Noctalia，登录器默认选择 **Umbriel**。上游通过 `inputs.umbriel`
+锁定，与宿主共用 nixpkgs；专用 `xdg-desktop-portal-umbriel` 提供屏幕共享。
+Apple DCP 没有硬件 Gamma LUT。Umbriel 自带软件 Gamma 渲染器，但锁定的
+`1bbbf155` 尚未设置协议的 fallback_gamma_size，也没把 SDR 表传给场景；
+`software-gamma-wiring.patch` 补齐这两处连接，并保留 HDR 白点路径。
+原来 niri 的整套着色器补丁已移除；Noctalia 仍按 4000K 设置夜灯。
+
+配置在 `hosts/asahi/umbriel/config.nix`；缩放仍统一改 `display.nix`，刘海 bar 随之变化。
+Noctalia 只写动态配色 `~/.config/umbriel/noctalia.toml`，主配置由 Home Manager 管理。
+Noctalia 和 voxtype 通过 `graphical-session.target` 启动，X11 改用 Umbriel 内置的
+按需 Xwayland，不再使用 xwayland-satellite。
+
+保留原有 Super+T/D/S、H/J/K/L、工作区、媒体和亮度键；Super+Shift+/ 显示快捷键。
+截图改由 Noctalia 执行：Super+Shift+3/4/5 分别截屏幕、区域、窗口，保存并复制；
+3/5 加 Ctrl 只复制。区域截图使用 Noctalia 的确认界面。
+Umbriel 没有对应的「扩展到剩余宽度」和「居中所有可见列」动作，原
+Super+Ctrl+F/C 暂不绑定；Super+Ctrl+R 改为恢复整列高度。
+
+**从 niri 首次迁移时使用 `boot`，不要在 niri 终端里执行 `nh os test/switch`。**
+移除 niri.service 会停止整个图形会话，连运行部署的终端一起结束，导致激活中断；
+登录器可能已经换成 Umbriel，但对应用户 unit 尚未安装，表现为 unit not found。
+2026-11 的两次失败日志均显示执行 test 后一秒内 niri 与部署终端同时退出。
+
+```bash
+sudo nixos-rebuild boot --flake /etc/nixos#asahi
+# 或 nh os boot；等命令完整成功退出，再保存工作并重启。
+```
+
+重启后在登录器进入 Umbriel。需要立即应用时，改在 Ctrl+Alt+F2 的 TTY 或 SSH 中
+执行 switch，避免部署进程隶属正在被移除的图形会话。
+进入后检查中文输入、锁屏、屏幕共享、截图和夜灯；夜灯需肉眼确认屏幕变暖。
+配置可用 `umbriel config validate` 检查。2026-11 无头 GLES2 验证：原版拒绝
+无 LUT 输出的 gamma-control；补丁版接受 2000K、启用软件色彩变换，客户端退出后恢复。
+这不替代内屏变暖的目视检查。启动失败用 Ctrl+Alt+F2 进 TTY，
+运行 `sudo nixos-rebuild switch --rollback` 后重新登录上一代桌面。
 
 ## Asahi Steam
 

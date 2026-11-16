@@ -5,7 +5,7 @@
     type = "fcitx5";
 
     fcitx5 = {
-      # Niri supports the native Wayland input-method protocol.
+      # Umbriel supports the native Wayland input-method protocol.
       waylandFrontend = true;
       addons = with pkgs; [
         fcitx5-gtk

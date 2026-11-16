@@ -12,6 +12,11 @@
       url = "github:dramforever/nixos-muvm-steam";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
+    # Umbriel 上游自带软件 Gamma 回退和专用屏幕共享 portal，替代本地 niri 补丁。
+    umbriel = {
+      url = "github:noctalia-dev/umbriel";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
     zen-browser = {
       url = "github:0xc000022070/zen-browser-flake";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
@@ -150,6 +155,7 @@
         modules = [
           home-manager.nixosModules.home-manager
           ./modules/unfree.nix
+          inputs.umbriel.nixosModules.default
           ./hosts/asahi/configuration.nix
           ./hosts/asahi/home.nix
         ];

@@ -148,19 +148,23 @@ let
       wrapProgram $out/bin/wechat --set QT_IM_MODULE fcitx
     '';
   };
-
-  # Night light, in the renderer. See the long note next to `programs.niri`.
-  niri = pkgs.niri.overrideAttrs (old: {
-    patches = (old.patches or [ ]) ++ [ ./niri/software-gamma.patch ];
-  });
 in
 {
   # Wayland compositor. The shell on top of it is noctalia, declared on the
   # home-manager side (hosts/asahi/home.nix) because that is where its
   # config.toml lives; that module installs the package and the user unit.
-  programs.niri = {
+  programs.umbriel = {
     enable = true;
-    package = niri;
+    # TODO revisit: when updating Umbriel
+    #   check: server.cpp sets fallback_gamma_size, and output.cpp forwards SDR
+    #          ramps into gamma_lut_color_transform; test a no-LUT output at 2000K
+    #   then:  remove this patch once both paths are connected upstream
+    #   last:  2026-11, 1bbbf155 bundles the shader but neither connection.
+    #          Patched headless GLES2: wlsunset at 2000K enables color_conversion;
+    #          client exit restores no_candidate. Physical panel still needs a visual check.
+    package = inputs.umbriel.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs (old: {
+      patches = (old.patches or [ ]) ++ [ ./umbriel/software-gamma-wiring.patch ];
+    });
   };
 
   # Give Qt applications a real platform theme so they follow the selected icon
@@ -171,14 +175,8 @@ in
     platformTheme = "qt5ct";
   };
 
-  # Login screen. Unlike dms-greeter, which ran inside a second copy of the
-  # session's compositor, this one brings its own bundled wlroots. That is the
-  # one place on this machine where the software-gamma patch below does not
-  # apply, so night light does not reach the login screen - no loss there, but
-  # it also means the greeter is the part most likely to break on a wlroots or
-  # DCP change, and a greeter that will not start is a machine that will not
-  # log in. `systemctl status greetd` and Ctrl+Alt+F2 are the way back.
-  #
+  # The greeter has its own compositor. Keep Ctrl+Alt+F2 as the recovery path
+  # if a display-driver change prevents the login screen from starting.
   # `services.displayManager.defaultSession` is deliberately gone: greetd runs
   # the greeter, and the greeter's own `session.default` picks what to launch,
   # so there is one place that decides instead of two.
@@ -192,8 +190,8 @@ in
 
     settings = {
       # `noctalia-greeter sessions` prints the picker label, which is the
-      # desktop entry's Name= - "Niri", not the niri.desktop id.
-      session.default = "Niri";
+      # desktop entry's Name= - "Umbriel", not the umbriel.desktop id.
+      session.default = "Umbriel";
       # Skips the user list and opens straight on the password prompt.
       user.default = "xerxes2";
 
@@ -209,7 +207,7 @@ in
 
       # Left alone, the greeter's compositor derives a scale from the panel
       # geometry, which is not necessarily the session's. Pin it to the same
-      # source of truth the niri output uses so login and desktop are one size.
+      # source of truth the Umbriel output uses so login and desktop are one size.
       output.scale = display.scale;
     };
   };
@@ -247,53 +245,10 @@ in
     settings.General.Experimental = true;
   };
 
-  # Night light needs a patched niri (the `niri` package in the let block above).
-  # Apple's DCP display controller exposes only the CTM color matrix and no
-  # GAMMA_LUT, while niri implements zwlr_gamma_control_v1 through GAMMA_LUT
-  # only, so the whole class of tools - noctalia night light, wlsunset,
-  # gammastep - reported success and changed nothing:
-  #
-  #   $ wlsunset -l -37.8 -L 144.9 -t 2000
-  #   gamma control of output eDP-1 (44) failed
-  #
-  # CTM cannot stand in for the protocol's three 1D ramps - a 3x3 matrix has no
-  # per-level curve - which is why that request was closed. So the ramp has to
-  # be applied in the renderer instead: the patch advertises a 256-entry ramp
-  # (one entry per 8-bit framebuffer level, so nothing is lost against a
-  # hardware LUT) and looks every channel up in a shader, the same fallback
-  # wlroots grew in !5166.
-  #
-  # A ramp is a per-pixel function, so the patch transforms exactly the damage
-  # rectangles and costs proportionally to the damaged area. The first version
-  # instead used niri's blur machinery (`is_framebuffer_effect`), which repaints
-  # the whole element whenever anything below it changes because blur is a
-  # neighborhood operation; that turned every blinking cursor into a full-output
-  # recomposite and measured +0.5 W on this panel. Measurements are in the
-  # commit message of the jj change that added this.
-  #
-  # What is still lost while a ramp is set is direct scanout, so a fullscreen
-  # video at night gets composited instead of being handed straight to the
-  # display. An identity ramp counts as no ramp, so night mode that is merely
-  # scheduled costs nothing during the day, and the cursor stays on its own
-  # plane - which also means the cursor itself stays untinted.
-  #
-  #   niri CTM request:  https://github.com/niri-wm/niri/issues/3672 (closed)
-  #   why not CTM:       https://gitlab.freedesktop.org/wlroots/wlroots/-/issues/1078
-  #   wlroots fallback:  https://gitlab.freedesktop.org/wlroots/wlroots/-/merge_requests/5166
-  #   Asahi kernel side: https://github.com/AsahiLinux/linux/issues/91
-  #
-  # TODO revisit: on every niri bump
-  #   check: whether the patch still applies (a failing build is the signal),
-  #          and whether upstream has grown its own software gamma:
-  #          `niri msg version` plus a look for `software_gamma` in the niri
-  #          source, or for a fallback in src/backend/tty.rs
-  #   then:  drop the overrideAttrs and hosts/asahi/niri/software-gamma.patch
-  #   test:  nix run nixpkgs#wlsunset -- -t 2000 -T 2001 -S 23:59 -s 00:01
-  #          should warm the screen within a second; Ctrl-C restores it
-  #   last:  2026-10, niri 26.04 still needs the patch; dry-run applies.
-  #          On kernel 7.2.12 gamma-control is advertised despite no GAMMA_LUT.
-  #          Noctalia 5.3.0 force-toggle sets 4000K then restores 6500K without
-  #          gamma/shader errors; physical screen colour needs visual confirmation.
+  # Apple DCP has no GAMMA_LUT. Umbriel's bundled scene renderer applies the
+  # gamma-control table in a shader when wlr_output_get_gamma_size() is zero;
+  # The small wiring patch above connects the protocol to this existing shader.
+  # https://github.com/noctalia-dev/umbriel/blob/main/umbrielfx/types/scene/wlr_scene.c
 
   # No geoclue any more. Noctalia resolves its own coordinates for the weather
   # widget and the night-light schedule (`[location]` in home.nix), so both the

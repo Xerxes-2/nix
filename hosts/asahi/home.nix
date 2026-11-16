@@ -7,7 +7,7 @@ let
   # 管的只读软链 —— 写不进去就会让 post_hook 每次换主题都报错。所以这里先把同一
   # 个路径写好：apply.sh 的 `grep -q noctalia\.toml` 命中，生成的内容和现有文件
   # 逐字节相同，cmp 之后它什么都不写。静态配置声明式，动态配色留给 noctalia。
-  # 窗口装饰不在这里关：niri 的 prefer-no-csd 已全局生效。
+  # 窗口装饰不在这里关：Umbriel 的 prefer_no_csd 已全局生效。
   alacrittyConfig = (pkgs.formats.toml { }).generate "alacritty.toml" {
     general.import = [ "~/.config/alacritty/themes/noctalia.toml" ];
   };
@@ -20,7 +20,7 @@ let
       # 按住说话（push_to_talk 是默认 mode），绑到 F5 听写键：内置键盘
       # （Apple MTP keyboard）把它上报为 KEY_MICMUTE(248)。voxtype 的按键名
       # 白名单里没有 MICMUTE，用 EVTEST_ 前缀直接给内核键码。对应的
-      # XF86AudioMicMute 绑定已从 niri/config.kdl 移除，免得录音时静音麦克风。
+      # XF86AudioMicMute 绑定已从 umbriel/config.nix 移除，免得录音时静音麦克风。
       key = "EVTEST_248";
       modifiers = [ ];
     };
@@ -51,8 +51,7 @@ in
     useGlobalPkgs = true;
     useUserPackages = true;
 
-    # niri writes a default config.kdl on first start; keep that copy around
-    # when home-manager takes the file over.
+    # Keep pre-existing user configuration when Home Manager takes it over.
     backupFileExtension = "hm-backup";
 
     users.xerxes2 =
@@ -65,15 +64,11 @@ in
 
         programs.home-manager.enable = true;
 
-        # niri's config is fully declarative: it is the upstream template with
-        # the noctalia integration applied (launcher, control center, lock,
-        # audio, brightness and media keys go through `noctalia msg`, no waybar
-        # autostart). The output scale comes from display.nix, which also sizes
-        # the bar's notch spacer.
-        xdg.configFile."niri/config.kdl".source = pkgs.replaceVars ./niri/config.kdl {
-          scale = display.scaleText;
-          xwaylandSatellite = lib.getExe pkgs.xwayland-satellite;
-        };
+        # Keep layout, keybinds and notch geometry declarative; Noctalia owns
+        # only the optional palette include, which remains writable.
+        xdg.configFile."umbriel/config.toml".source =
+          (pkgs.formats.toml { }).generate "umbriel-config.toml"
+            (import ./umbriel/config.nix { inherit display; });
 
         xdg.configFile."alacritty/alacritty.toml".source = alacrittyConfig;
 
@@ -81,7 +76,7 @@ in
 
         # voxtype 上游只有 `voxtype setup systemd` 的命令式安装，这里照着它生成的
         # unit（src/setup/systemd.rs）声明同样的内容。挂 graphical-session.target：
-        # wtype 注入文字要 WAYLAND_DISPLAY，niri-session 会把它导进 systemd 用户环境
+        # wtype 注入文字要 WAYLAND_DISPLAY，Umbriel 的托管会话会把它导进 systemd 用户环境
         # （noctalia 的 service 同一个前提）。
         systemd.user.services.voxtype = {
           Unit = {
@@ -126,13 +121,13 @@ in
               # 物理 notch 连成一片。代价是所有暗色面板一起变纯黑，不只是 bar。
               pure_black_dark = true;
 
-              # 内置模板接管原来 DMS 负责写的那几个文件：alacritty 配色、niri
-              # 的焦点环/边框颜色（取代 dms/colors.kdl）、GTK 和 Qt 调色板。
+              # 内置模板接管原来 DMS 负责写的那几个文件：alacritty 配色、Umbriel
+              # 的边框颜色、GTK 和 Qt 调色板。
               templates = {
                 enable_builtin_templates = true;
                 builtin_ids = [
                   "alacritty"
-                  "niri"
+                  "umbriel"
                   "gtk3"
                   "gtk4"
                   "qt"
@@ -145,8 +140,7 @@ in
             # 不想要这次查询就删掉它，改写死 latitude/longitude。
             location.auto_locate = true;
 
-            # 夜灯仍然走 wlr-gamma-control，所以前提照旧是 gui.nix 里那个打了
-            # software-gamma 补丁的 niri。
+            # 夜灯走 wlr-gamma-control；Umbriel 在 Apple DCP 上自动使用软件 Gamma。
             nightlight = {
               enabled = true;
               temperature_night = 4000;

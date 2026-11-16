@@ -1,0 +1,61 @@
+Umbriel bundles the scene software LUT implementation but does not advertise
+fallback_gamma_size or pass the client's SDR table into the scene. Connect
+those paths without registering a second hardware-gamma handler, and keep
+HDR white-point handling separate from encoded SDR ramps.
+
+--- a/src/server/server.cpp
++++ b/src/server/server.cpp
+@@ -762,4 +762,8 @@
+
+     m_gammaManager = wlr_gamma_control_manager_v1_create(m_display);
++    // Advertise a software ramp only when the renderer can apply it.
++    if (m_renderer->features.output_color_transform) {
++      m_gammaManager->fallback_gamma_size = 256;
++    }
+     m_setGamma.notify = onSetGamma;
+     wl_signal_add(&m_gammaManager->events.set_gamma, &m_setGamma);
+--- a/src/output/output.cpp
++++ b/src/output/output.cpp
+@@ -764,4 +764,8 @@
+       return;
+     }
++    // Keep SDR ramps out of the HDR/PQ path, which uses only the white point.
++    const bool softwareGamma = !hdrActive() && m_server->renderer()->features.output_color_transform
++        && wlr_output_get_gamma_size(m_output) == 0;
++    wlr_scene_output_set_software_gamma_lut(m_sceneOutput, softwareGamma ? control : nullptr);
+     const auto white = hdrWhitePointFromGamma(
+         control != nullptr ? control->table : nullptr, control != nullptr ? control->ramp_size : 0
+@@ -908,4 +912,9 @@
+               wlr_gamma_control_v1* control =
+                   wlr_gamma_control_manager_v1_get_control(m_server->gammaManager(), m_output);
++              // No hardware LUT: the scene applies the SDR ramp after the modeset.
++              if (wlr_output_get_gamma_size(m_output) == 0) {
++                wlr_output_state_set_color_transform(&state, nullptr);
++                return true;
++              }
+               if (wlr_gamma_control_v1_apply(control, &state)) {
+                 return true;
+--- a/umbrielfx/include/umbrielfx/types/wlr_scene.h
++++ b/umbrielfx/include/umbrielfx/types/wlr_scene.h
+@@ -1352,3 +1352,7 @@
+ struct wlr_scene_tree* wlr_scene_drag_icon_create(struct wlr_scene_tree* parent, struct wlr_drag_icon* drag_icon);
+
++/** Update only the renderer LUT; hardware gamma remains compositor-owned. */
++void wlr_scene_output_set_software_gamma_lut(
++    struct wlr_scene_output* output, struct wlr_gamma_control_v1* control);
++
+ #endif
+--- a/umbrielfx/types/scene/wlr_scene.c
++++ b/umbrielfx/types/scene/wlr_scene.c
+@@ -4534,4 +4534,11 @@
+ }
+
++void wlr_scene_output_set_software_gamma_lut(
++    struct wlr_scene_output* output, struct wlr_gamma_control_v1* control) {
++  wlr_color_transform_unref(output->gamma_lut_color_transform);
++  output->gamma_lut_color_transform = wlr_gamma_control_v1_get_color_transform(control);
++  wlr_output_schedule_frame(output->output);
++}
++
+ static void scene_handle_gamma_control_manager_v1_set_gamma(struct wl_listener* listener, void* data) {
+   const struct wlr_gamma_control_manager_v1_set_gamma_event* event = data;
