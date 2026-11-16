@@ -17,6 +17,11 @@ let
   steel =
     if pkgs.stdenv.hostPlatform.isLinux && pkgs.stdenv.hostPlatform.isAarch64 then
       pkgs.steel.overrideAttrs (old: {
+        # Asahi 上多个 release/LTO rustc 并行曾两次触发全局 OOM（2026-11）。
+        # 只限制这个包，避免整机 rebuild 都被迫串行。
+        preBuild = (old.preBuild or "") + ''
+          export NIX_BUILD_CORES=1
+        '';
         postPatch = (old.postPatch or "") + ''
           substituteInPlace crates/steel-core/src/steel_vm/vm.rs crates/steel-core/src/steel_vm/vm/jit.rs \
             --replace-fail 'all(target_os = "windows", target_arch = "aarch64")' \

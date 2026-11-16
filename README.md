@@ -162,6 +162,10 @@ for p in /sys/block/sda/sda*; do echo "$p start=$(cat $p/start) size=$(cat $p/si
 
 找包名：https://search.nixos.org 或 `nix search nixpkgs xxx`。
 
+`steel` 在 aarch64 Linux 上保留禁用 JIT 的补丁，并单线程编译：Asahi 上多个
+release/LTO 编译进程并行曾耗尽内存，导致 `rustc` 被 OOM killer 杀死。
+并发限制仅作用于 steel，其余包仍按 Nix 的全局设置构建。
+
 ## 应用变更
 
 两台 NixOS 机器的主机名都能对上 flake 里的 attribute（`asahi` 直接同名；oci 的真实
