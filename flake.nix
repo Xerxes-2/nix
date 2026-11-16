@@ -7,6 +7,11 @@
       url = "github:nix-community/nixos-apple-silicon";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
+    # 原生 muvm/FEX Steam 试用入口；与宿主共用 Mesa/FEX 版本，避免另一套 nixpkgs 漂移。
+    nixos-muvm-steam = {
+      url = "github:dramforever/nixos-muvm-steam";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
     zen-browser = {
       url = "github:0xc000022070/zen-browser-flake";
       inputs.nixpkgs.follows = "nixpkgs-unstable";

@@ -2,8 +2,9 @@
 #
 # Steam on Apple Silicon needs FEX (x86 emulation), muvm (a 4K-page microVM,
 # because x86 code assumes 4K pages while the machine runs 16K) and the Asahi
-# Mesa/Honeykrisp drivers. Fedora packages all of that; nixpkgs does not, and
-# `programs.steam` cannot even evaluate on aarch64.
+# Mesa/Honeykrisp drivers. This is the tested Fedora fallback; the native
+# nixos-muvm-steam path is documented in README.md. `programs.steam` itself
+# cannot evaluate on aarch64.
 #
 # Build and run:
 #   podman build -t steam:latest hosts/asahi/steam

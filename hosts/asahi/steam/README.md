@@ -4,8 +4,53 @@ Steam has no `aarch64-linux` build, so `programs.steam` cannot work here:
 it fails with `i686 Linux package set can only be used with the x86 family`.
 Fedora 44 packages the FEX x86 rootfs as `fex-emu-rootfs-fedora`.
 
-Fedora Asahi Remix packages the whole stack (`dnf install steam`), so we run
-that inside a container instead of reproducing it in nixpkgs.
+Two launch paths are available: the native Nix wrapper below, and the tested
+Fedora Asahi Remix container (`dnf install steam`) kept as a fallback.
+
+## Native Nix launcher
+
+`inputs.nixos-muvm-steam` pins
+<https://github.com/dramforever/nixos-muvm-steam>, following this flake's nixpkgs.
+It installs **`muvm-steam-run-free`** (the package attribute is `muvm-steam`).
+This removes the Fedora container layer; muvm and FEX are still required.
+
+Build/apply with `sudo nixos-rebuild switch --flake /etc/nixos --option
+always-allow-substitutes true`. Upstream recommends this option to prefer cached
+`steam-run-free` over building x86 packages through emulation. A missing cache
+can still require x86 builds.
+
+Download a `steam_<version>.tar.gz` from
+<https://repo.steampowered.com/steam/archive/stable/> and unpack it into a
+dedicated directory, for example `~/Games/steam-native`. Then run:
+
+```sh
+muvm-steam-run-free
+# Inside the guest shell (use the actual path to the extracted steam script):
+steam-native-guest
+```
+
+The upstream launcher opens a guest shell and prints the second command's
+template; it does not download or automatically launch Steam. Its PulseAudio
+configuration disables shared memory for the guest connection. It uses the
+normal user home, whereas the Fedora box uses `~/Distrobox/steam`; keep these
+installs separate during testing, and do not run both clients simultaneously.
+
+`steam-native-guest` launches `~/Games/steam-native/steam` with a private D-Bus
+session inside steam-run. Without it, runtime-launcher-service cannot find a
+session bus; dbus-run-session with its default config fails with "needs one or
+more <listen> elements". The helper supplies an explicit config from /nix/store:
+the FHS environment has a private /tmp, so a config created in the guest shell's
+/tmp would not be visible inside steam-run.
+
+2026-11-16: the user confirms Steam starts and Isaac is playable with the
+explicit session-bus configuration in the shared home directory. The packaged
+helper uses the same configuration from /nix/store; that helper still needs a
+runtime check after applying. Chinese fonts, audio, Vulkan details, Proton
+version and saves were not separately confirmed. Existing Fedora container and
+game files are kept as a fallback; its font setup is not applied to this path.
+
+Update this input with `nix run .#update -- nixos-muvm-steam`; nixpkgs updates
+also change its muvm/FEX/Mesa dependencies.
 
 ## The stack
 
@@ -21,7 +66,7 @@ x86 code assumes 4K pages while Apple hardware runs 16K, and Linux cannot mix
 page sizes between processes - hence the microVM. See
 <https://asahilinux.org/2024/10/aaa-gaming-on-asahi-linux/>.
 
-## Setup
+## Fedora container setup
 
 ```sh
 podman build -t steam:latest /etc/nixos/hosts/asahi/steam

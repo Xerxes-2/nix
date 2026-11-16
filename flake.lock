@@ -313,6 +313,26 @@
         "type": "github"
       }
     },
+    "nixos-muvm-steam": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs-unstable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1794165349,
+        "narHash": "sha256-5h9akZn4Ip2CW0yZpiA/U4lwBzkBrEZYKvECw+ca4s8=",
+        "owner": "dramforever",
+        "repo": "nixos-muvm-steam",
+        "rev": "ebb9d6457aa892b616f703c4d5b3843fce79ae76",
+        "type": "github"
+      },
+      "original": {
+        "owner": "dramforever",
+        "repo": "nixos-muvm-steam",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1792949843,
@@ -401,6 +421,7 @@
         "lazycreep": "lazycreep",
         "nix-darwin": "nix-darwin",
         "nixos-apple-silicon": "nixos-apple-silicon",
+        "nixos-muvm-steam": "nixos-muvm-steam",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "sillytavern-claude-oauth": "sillytavern-claude-oauth",
         "sops-nix": "sops-nix",

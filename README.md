@@ -283,6 +283,14 @@ nix eval --raw .#nixosConfigurations.asahi.config.system.build.toplevel.drvPath
 asahi 的内核来自 `nixos-apple-silicon`，上游**没有 binary cache**（见其
 `docs/binary-cache.md`），所以 nixpkgs 一动就要本地编内核，几十分钟起步。
 
+## Asahi Steam
+
+Asahi Steam 现有两条入口：原生 `muvm-steam-run-free`（进入 guest 后运行
+`steam-native-guest`，已确认 Steam 启动及 Isaac 可玩）和保留的 Fedora
+Distrobox（回退）。下载 Steam、构建时的 substitute 选项和游戏验证步骤见
+[Steam 手册](hosts/asahi/steam/README.md)。原生入口随 flake 管理 muvm/FEX/Mesa，
+Steam 客户端和游戏数据仍由用户管理。
+
 ## 更新 Asahi 固件
 
 本机固件和设备校准数据在启动时由 initrd 从 ESP 的
