@@ -505,6 +505,10 @@ sudo journalctl -u battlesnake -f             # 每回合一行 move ... (x ms)�
 
 ## 已知的坑
 
+**JACK 客户端用 `pw-jack <程序>` 启动。** 不再启用已弃用的
+`services.pipewire.jack.enable`，避免它向整个桌面注入 `LD_LIBRARY_PATH`；
+`pipewire.jack` 已安装，常规 ALSA / PulseAudio 音频仍由 PipeWire 接管。
+
 **DRM 流媒体（Netflix / Spotify Web / Prime）需要 Widevine，Mozilla 不给 aarch64 出。**
 `gui.nix` 里按 Asahi 上游的办法自己装了一份（从 ChromeOS 镜像里取 arm64 CDM 再改 ELF），
 Zen 和 Firefox 都配好了。它是 unfree 且不可再分发的，所以在 `modules/unfree.nix` 里单独放行。

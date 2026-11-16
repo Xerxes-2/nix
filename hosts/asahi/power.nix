@@ -79,7 +79,7 @@
   #                        # "Monitored memory pressure cgroups"
   #   then:  replace this only if the NixOS module can target app.slice without
   #          also arming the root-owned user.slice and session.slice
-  #   last:  2026-10, running systemd 262 / nixpkgs 02c087f: oomctl confirms
+  #   last:  2026-11, running systemd 262 / nixpkgs d5cc683: oomctl confirms
   #          only app.slice at 50% after reboot. enableUserSlices still arms
   #          both user.slice and every user-manager slice; keep the drop-in.
   systemd.user.units."app.slice" = {
@@ -115,9 +115,7 @@
   #   check: cat /sys/class/power_supply/macsmc-battery/charge_control_end_threshold
   #          # 80 = in effect, 100 = no limit, ENOENT = driver dropped it
   #   then:  fall back to charge_behaviour, or drop the rule if it is a no-op
-  #   last:  2026-10, running asahi-7.2.12-2: end threshold reads 80 after
-  #          reboot (start reads 75). The driver still registers both threshold
-  #          properties when CHWA or CHLS is present; keep the rule.
+  #   last:  2026-11, running 7.3.3: end threshold reads 80; keep the rule.
   services.udev.extraRules = ''
     SUBSYSTEM=="power_supply", KERNEL=="macsmc-battery", ATTR{charge_control_end_threshold}="80"
   '';
@@ -169,10 +167,9 @@
   #          cat /sys/devices/system/cpu/cpufreq/policy4/scaling_cur_freq
   #          # 3264000 = schedutil still capped, 3504000 = the fix landed
   #   then:  delete the cpu-boost unit below, the tmpfiles flag is enough
-  #   last:  2026-10, running 7.2.12: CPU4 and CPU7 loaded separately under
-  #          schedutil, four samples each all read 3264000 despite boost=1 and
-  #          scaling_max_freq=3504000. capacity_freq_ref is still latched at
-  #          CPUFREQ_CREATE_POLICY (arch_topology.c:407); keep cpu-boost.
+  #   last:  2026-11, running 7.3.3: CPU4 loaded under schedutil, four samples
+  #          all read 3264000 with boost=1. Keep cpu-boost; CPU7 and the
+  #          performance-governor comparison were not re-tested this time.
   systemd.tmpfiles.rules = [
     "w /sys/devices/system/cpu/cpufreq/boost - - - - 1"
   ];

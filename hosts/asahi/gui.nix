@@ -313,7 +313,6 @@ in
     alsa.enable = true;
     alsa.support32Bit = true;
     pulse.enable = true;
-    jack.enable = true;
   };
 
   # Useful GUI/session tools.
@@ -325,6 +324,9 @@ in
     firefox
     nautilus
     pavucontrol
+    # nixpkgs deprecated jack.enable: use explicit pw-jack for JACK clients
+    # instead of injecting PipeWire libraries into every process via LD_LIBRARY_PATH.
+    pipewire.jack
     telegram-desktop
     vesktop # Discord client; official Discord has no aarch64-linux build.
     # 按住说话的语音输入（whisper.cpp 后端）。选 -vulkan 变体：whisper.cpp 以
