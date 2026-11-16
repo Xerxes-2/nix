@@ -9,7 +9,7 @@
     ../../modules/btrfs-tools.nix
     ./gui.nix
     ./input.nix
-    ./containers.nix
+    ./steam.nix
     ./power.nix
     ./network.nix
     ./dualboot.nix
@@ -31,7 +31,7 @@
 
     # Run x86_64 Linux binaries through qemu-user. This is the general-purpose
     # escape hatch (one-off binaries, building x86 packages); the FEX + muvm
-    # container in containers.nix is the fast path for anything that needs
+    # microVM in steam.nix is the fast path for anything that needs
     # real throughput, like games.
     binfmt.emulatedSystems = [ "x86_64-linux" ];
   };

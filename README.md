@@ -46,10 +46,10 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 │   ├── gui.nix             # niri + noctalia-greeter + 音频 + 字体 + Widevine
 │   ├── display.nix         # 内屏刘海几何的唯一真相，缩放改这里
 │   ├── input.nix           # fcitx5 双拼
-│   ├── containers.nix      # podman / distrobox
+│   ├── steam.nix           # 原生 muvm/FEX Steam 和桌面入口
 │   ├── niri/               # config.kdl + 软件夜间模式补丁（见 gui.nix 的注释）
 │   ├── home.nix            # xerxes2 用户的 Home Manager，含 noctalia 的 config.toml
-│   └── steam/              # Fedora Asahi 游戏栈容器（FEX + muvm），见其 README
+│   └── steam/              # 原生 Steam 使用文档，见其 README
 ├── hosts/macmini/          # Mac mini Mid 2011 Server，无头，见「Mac mini」
 │   ├── configuration.nix   # 网络 / ssh / 用户 / nix
 │   ├── hardware.nix        # 引导、驱动（b43-ht Wi‑Fi，wl 备用启动项）、bcachefs 池
@@ -285,11 +285,10 @@ asahi 的内核来自 `nixos-apple-silicon`，上游**没有 binary cache**（�
 
 ## Asahi Steam
 
-Asahi Steam 现有两条入口：原生 `muvm-steam-run-free`（进入 guest 后运行
-`steam-native-guest`，已确认 Steam 启动及 Isaac 可玩）和保留的 Fedora
-Distrobox（回退）。下载 Steam、构建时的 substitute 选项和游戏验证步骤见
-[Steam 手册](hosts/asahi/steam/README.md)。原生入口随 flake 管理 muvm/FEX/Mesa，
-Steam 客户端和游戏数据仍由用户管理。
+Asahi Steam 使用原生 muvm/FEX，桌面应用菜单选择 **Steam**，或运行 `steam-native`。
+已确认 Steam 启动及 Isaac 可玩；Fedora 容器和专用镜像已退役，旧
+`~/Distrobox/steam` 数据保留。下载、更新和调试步骤见
+[Steam 手册](hosts/asahi/steam/README.md)。Steam 客户端和游戏数据仍由用户管理。
 
 ## 更新 Asahi 固件
 
