@@ -34,7 +34,7 @@ Home Manager，共用 `modules/home/cli.nix` 那套 CLI 工具。
 │   ├── configuration.nix   # NixOS 入口，imports 下面的模块
 │   ├── boot.nix filesystems.nix network.nix users.nix packages.nix
 │   ├── services/           # wakapi / sillytavern / vaultwarden / ntfy / restic / cloudflared / chive / lazycreep / battlesnake / oracle-cloud-agent / misc
-│   ├── home.nix            # ubuntu 用户的 Home Manager（含 dufs）
+│   ├── home.nix            # ubuntu 用户的 Home Manager（含 dufs、Rex）
 │   ├── sillytavern.yaml    # SillyTavern 配置（无机密，进 git）
 │   └── chive.toml          # chive 虚拟仓配置（无机密，进 git）
 ├── hosts/asahi/
@@ -509,6 +509,25 @@ sudo journalctl -u battlesnake -f             # 每回合一行 move ... (x ms)�
 
 **天梯 A/B**：程序自带按 game id 首位奇偶分组的对照（`start` 日志里 `arm=legacy/new`），
 用来在同一批对手上比较新旧配置（现在比的是新旧 Standard 权重）；`SNAKE_AB=0` 关闭。
+
+## Rex
+
+oci 上的 Rex 是 ubuntu 的 personal server：Home Manager 模块 `services.rex`（`hosts/oci/home.nix`），
+跑在 user service `rex` 里，靠 ubuntu 的 linger 开机拉起、退出登录不停。远程走公网 ssh，
+不开它自带的 Tailscale，也不用 NixOS 模块的 login server（取舍见 `home.nix` 注释）。
+
+```bash
+rex server status                 # 服务跑着没
+systemctl --user start rex        # rex server stop 之后 systemd 不会自动拉起，用这个
+journalctl --user -u rex          # 日志
+```
+
+**更新**：`nix flake update rex` 再 switch。`rex.service` 是 `X-SwitchMethod=keep-old`，
+switch 不会重启它；想用上新版要手动 `systemctl --user restart rex`，
+**这会结束所有会话**。
+
+HM 接管了 `~/.ssh/config`，里面只有 Rex 的 ssh guard（从 rex 终端 ssh 出去时不把
+`TERM=xterm-rex` 带过去）。要加 ssh 配置就写 `programs.ssh`，别直接改那个文件。
 
 ## 已知的坑
 

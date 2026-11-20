@@ -69,6 +69,19 @@
       url = "github:Xerxes-2/battlesnake";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
+    # Rex 终端复用器，oci 上作为 ubuntu 的 personal server 跑（见 hosts/oci/home.nix）。
+    # 上游文档写了 stable / preview / snapshot 三个 channel，但 stable 目前 404（2026-11），
+    # 先用 snapshot。URL 总指向最新版，
+    # flake.lock 钉住具体版本，升级 = nix flake update rex。
+    # 包是预编译二进制，nixpkgs 只用于打包包装，follows 省一份 nixpkgs。
+    # TODO revisit: 上游开始发 stable channel 时
+    #   check: curl -sLI -o /dev/null -w '%{http_code}\n' https://pkgs.superlogical.com/rex/nix/stable.tar.gz
+    #   then:  返回 200 就把 url 换成 stable.tar.gz，再 nix flake update rex
+    #   last:  2026-11, stable 404、preview/snapshot 200，用 snapshot
+    rex = {
+      url = "https://pkgs.superlogical.com/rex/nix/snapshot.tar.gz";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
     sillytavern-claude-oauth = {
       url = "github:Xerxes-2/sillytavern-claude-oauth";
       flake = false;
