@@ -68,7 +68,6 @@ in
     gh
     git
     go
-    herdr
     htop
     jjui
     jq
@@ -101,7 +100,6 @@ in
     tokei
     tombi
     tree
-    tuios
     unar
     unzip
     uv
